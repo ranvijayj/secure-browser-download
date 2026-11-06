@@ -38,7 +38,7 @@ CHECKED BEFORE SAVING
 PRIVACY
 • Everything happens locally in your browser. No servers, no accounts, no analytics, no tracking.
 • Asks for no website access at install. It uses the tab you right-click in, and asks per site only if needed.
-• Open source: [GitHub URL]
+• Open source: https://github.com/ranvijayj/secure-browser-download
 
 IMPORTANT: there is no password recovery. If you forget the password, the file cannot be opened. Keep the password in your password manager.
 
@@ -65,7 +65,7 @@ Save files the user chooses to download in password-protected (encrypted) form, 
 **Data usage:** Check none of the data types. The extension does not collect or transmit any user data.
 Certify: not sold to third parties; not used for unrelated purposes; not used for creditworthiness.
 
-**Privacy policy URL:** `https://github.com/<you>/securedl/blob/main/PRIVACY.md`
+**Privacy policy URL:** `https://github.com/ranvijayj/secure-browser-download/blob/main/PRIVACY.md`
 
 ## Distribution tab
 - Visibility: Public

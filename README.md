@@ -26,7 +26,7 @@ Try it: `samples/` has one of each. The password is `test1234`.
 ## Install
 
 - **Chrome Web Store:** _coming soon_
-- **From source:** clone this repo → `chrome://extensions` → turn on Developer mode → **Load unpacked** → select `ext/`.
+- **From source:** `git clone https://github.com/ranvijayj/secure-browser-download` → `chrome://extensions` → turn on Developer mode → **Load unpacked** → select `ext/`.
 
 ## Use
 
