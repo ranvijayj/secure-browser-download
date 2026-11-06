@@ -23,7 +23,9 @@ HOW IT OPENS (no app to install)
 
 FEATURES
 • Automatic detection: asks when documents & images (or every file) start downloading
-• "Don't ask again" for sites you trust
+• "Always save normally" for sites you trust
+• Works with downloads that pages build themselves, too
+• "Recent downloads" shows what happened to each download and why
 • Right-click any link, image or video → Download with password
 • Lock a file that's already on your disk
 • Uses the page you're on to fetch the file, so downloads from sites you're signed in to still work

@@ -9,8 +9,15 @@
     <option value="ask-docs">Ask me for documents &amp; images</option>
     <option value="ask-all">Ask me for every download</option>
   </select>
-  <p class="hint" id="modeHint">The download pauses and SecureDL asks whether to lock it. Needs access to all sites so it can fetch the file.</p>
-  <p class="hint" id="neverWrap" hidden>Not asking for: <span id="neverList"></span> · <a href="#" id="neverReset">reset</a></p>
+  <p id="state" class="hint"></p>
+  <div id="needAccess" class="warn" hidden>
+    ⚠ Automatic detection is on, but Chrome hasn't given SecureDL access to fetch downloads yet, so nothing is intercepted.
+    <button id="grant">Give access…</button>
+  </div>
+  <details id="recentWrap">
+    <summary class="hint">Recent downloads</summary>
+    <ul id="recent" class="log"></ul>
+  </details>
   <hr>
   <p><b>Lock a file already on disk</b></p>
   <input type="file" id="file">
@@ -21,7 +28,9 @@
   <p id="pwWarn" class="warn" hidden></p>
   <button id="go">Encrypt &amp; save</button>
   <p id="status" role="status"></p>
+  <p class="hint"><a href="options.html" target="_blank">Settings</a></p>
 <script src="lib/pdf-lib.min.js"></script>
 <script src="crypto.js"></script>
+<script src="settings.js"></script>
 <script src="popup.js"></script>
 </body></html>

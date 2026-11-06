@@ -20,11 +20,20 @@
     <button id="go">Encrypt &amp; save</button>
     <button id="skip" class="secondary" hidden>Save normally (no password)</button>
   </div>
-  <label class="row hint" id="neverRow" hidden><input type="checkbox" id="never"> Don't ask again for <span id="neverSite"></span></label>
+  <p id="neverRow" class="hint" hidden><a href="#" id="never">Always save normally from <span id="neverSite"></span></a> (stop asking for this site)</p>
   <p id="status" role="status"></p>
   <div id="access" class="box" hidden>
     SecureDL needs permission to download from <b id="accessHost"></b>.
     <button id="allow">Allow for this site</button>
+  </div>
+  <div id="pick" class="box" hidden>
+    <b>Lock the downloaded copy instead</b>
+    <p class="hint" id="pickHint">SecureDL couldn't fetch this file again, but Chrome can finish downloading it. Then pick it here; it will be locked and the unprotected copy deleted.</p>
+    <button id="pickStart" class="secondary">Finish the download, then pick it</button>
+    <div id="pickFileWrap" hidden>
+      <p class="hint">Select <b id="pickName"></b> in <span id="pickDir"></span>:</p>
+      <input type="file" id="pickFile">
+    </div>
   </div>
   <div id="fallback" class="box hint" hidden>
     <b>Workaround:</b> download the file normally, then click the SecureDL icon in the toolbar,

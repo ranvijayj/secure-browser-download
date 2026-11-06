@@ -34,7 +34,10 @@ Try it: `samples/` has one of each. The password is `test1234`.
   - **Ask me for documents & images** (PDF, Office, CSV, images, archives…), or
   - **Ask me for every download**.
 
-  The download pauses and a "Lock this download?" tab opens. Choose **Encrypt & save** or **Save normally**. Tick "Don't ask again for this site" for sites you trust. If you close the tab without choosing, the download resumes.
+  Chrome asks once to give SecureDL access to all sites, which it needs to fetch the file. If access is missing, the toolbar icon shows a red **!**.
+  The download pauses and a "Lock this download?" tab opens. Choose **Encrypt & save**, **Save normally**, or **Always save normally from <site>**. If you close the tab without choosing, the download resumes.
+  Downloads a page builds itself (`blob:` downloads) are handled too. If SecureDL can't fetch the file again, it lets Chrome finish, asks you to pick the file, locks it, and deletes the unprotected copy.
+  **Recent downloads** in the popup and Settings shows what SecureDL did with each download and why. Check it first if something wasn't intercepted.
 - **Right-click** any link, image or video → **Download with password**.
 - **Toolbar icon → Lock a file already on disk.**
 

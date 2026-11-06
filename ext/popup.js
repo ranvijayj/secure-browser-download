@@ -1,27 +1,24 @@
 const $ = (id) => document.getElementById(id);
-const ALL = { origins: ["<all_urls>"] };
 
 async function load() {
-  const { mode = "off", neverAsk = [], protectAll } = await chrome.storage.local.get(["mode", "neverAsk", "protectAll"]);
-  const effective = mode !== "off" || protectAll ? (mode !== "off" ? mode : "ask-all") : "off";
-  $("mode").value = effective !== "off" && !(await chrome.permissions.contains(ALL)) ? "off" : effective;
-  $("modeHint").hidden = $("mode").value === "off";
-  $("neverWrap").hidden = neverAsk.length === 0;
-  $("neverList").textContent = neverAsk.join(", ");
+  const s = await readSettings();
+  $("mode").value = s.mode;
+  $("state").textContent = MODE_TEXT[s.mode] + (s.neverAsk.length ? ` Not asking for: ${s.neverAsk.join(", ")}.` : "");
+  $("needAccess").hidden = !(s.mode !== "off" && !s.granted);
+  renderLog($("recent"), s.log);
+  $("recentWrap").open = s.mode !== "off" && s.log.length > 0;
 }
 load();
+chrome.storage.onChanged.addListener(load);
 
 $("mode").onchange = async () => {
-  const mode = $("mode").value;
-  if (mode !== "off") {
-    // Only automatic detection needs access to all sites; ask at the moment the user turns it on.
-    const granted = await chrome.permissions.request(ALL);
-    if (!granted) { $("mode").value = "off"; $("modeHint").hidden = true; return; }
-  }
-  await chrome.storage.local.set({ mode, protectAll: false });
-  $("modeHint").hidden = mode === "off";
+  await saveMode($("mode").value);
+  const s = await readSettings();
+  // Access is requested in a normal tab, where Chrome's dialog can't close anything.
+  if (s.mode !== "off" && !s.granted) chrome.tabs.create({ url: "options.html#grant" });
+  load();
 };
-$("neverReset").onclick = async (e) => { e.preventDefault(); await chrome.storage.local.set({ neverAsk: [] }); load(); };
+$("grant").onclick = () => chrome.tabs.create({ url: "options.html#grant" });
 
 let acceptedWeak = null;
 $("pw").addEventListener("input", () => { acceptedWeak = null; $("pwWarn").hidden = true; });

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>SecureDL settings</title>
+<link rel="icon" href="icons/32.png"><link rel="stylesheet" href="style.css"></head>
+<body>
+  <h2><img src="icons/48.png" alt="" class="logo"> SecureDL settings</h2>
+
+  <label for="mode"><b>When a download starts</b></label>
+  <select id="mode">
+    <option value="off">Do nothing (right-click only)</option>
+    <option value="ask-docs">Ask me for documents &amp; images</option>
+    <option value="ask-all">Ask me for every download</option>
+  </select>
+  <p id="state" class="hint"></p>
+
+  <div id="access" class="box">
+    <div id="accessText"></div>
+    <button id="grant" hidden>Give SecureDL access</button>
+    <p class="hint" id="accessWhy">Automatic detection needs access to all sites so SecureDL can fetch the file that started downloading and encrypt it. Files are never sent anywhere; everything stays on this computer.</p>
+  </div>
+
+  <h3>Sites that always save normally</h3>
+  <ul id="never" class="log"></ul>
+
+  <h3>Recent downloads</h3>
+  <p class="hint">What SecureDL did with each download, and why.</p>
+  <ul id="recent" class="log"></ul>
+  <button id="clearLog" class="secondary">Clear list</button>
+
+<script src="settings.js"></script>
+<script src="options.js"></script>
+</body></html>

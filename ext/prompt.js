@@ -11,7 +11,7 @@ $("src").textContent = url;
 if (ask) {
   document.title = "SecureDL – Lock this download?";
   $("title").textContent = "Lock this download?";
-  $("askInfo").hidden = false; $("skip").hidden = false; $("neverRow").hidden = false;
+  $("askInfo").hidden = false; $("skip").hidden = false; $("neverRow").hidden = !site;
   $("askName").textContent = params.get("name") || "download";
   $("askSite").textContent = site; $("neverSite").textContent = site;
   chrome.downloads.search({ id: dlId }).then(([d]) => { if (d?.state === "complete") $("askDone").hidden = false; });
@@ -92,7 +92,6 @@ async function discardOriginal() {
 }
 
 async function rememberNeverAsk() {
-  if (!ask || !$("never").checked || !site) return;
   const { neverAsk = [] } = await chrome.storage.local.get("neverAsk");
   if (!neverAsk.includes(site)) await chrome.storage.local.set({ neverAsk: [...neverAsk, site] });
 }
@@ -119,11 +118,18 @@ async function run() {
   try {
     $("status").textContent = "Downloading into memory…";
     const r = await getFile();
-    const name = nameFromUrl(r.finalUrl || url, r.cd);
+    // For a detected download, Chrome already knows the real filename (essential for page-made
+    // blob: downloads, whose URL is just a random ID).
+    let name = nameFromUrl(r.finalUrl || url, r.cd);
+    if (dlId !== null && /^(blob|data):/.test(url)) {
+      const [d] = await chrome.downloads.search({ id: dlId });
+      const base = (d?.filename || "").split(/[\\/]/).pop();
+      if (base && !base.endsWith(".crdownload")) name = base;
+      else if (/^blob:/.test(url) && params.get("name") && !params.get("name").startsWith("file from")) name = params.get("name");
+    }
     $("status").textContent = "Encrypting and test-opening…";
     const saved = await saveEncrypted(await encryptFile(r.blob, name, pw));
     await discardOriginal();
-    await rememberNeverAsk();
     $("status").textContent = "✅ Saved " + saved;
     closeSoon();
   } catch (e) {
@@ -134,18 +140,69 @@ async function run() {
     } else {
       $("status").textContent = "❌ " + e.message + (/not saved|Nothing was saved/.test(e.message) ? "" : " Nothing was saved.");
       if (e.fallback && !ask) $("fallback").hidden = false;
+      if (e.fallback && ask && dlId !== null) $("pick").hidden = false;
     }
     $("go").disabled = false; $("skip").disabled = false;
   }
 }
 
-$("skip").onclick = async () => {
+async function saveNormally(always) {
   $("skip").disabled = true; $("go").disabled = true;
   const [d] = await chrome.downloads.search({ id: dlId });
   if (d?.state === "in_progress" && d.paused) await chrome.downloads.resume(dlId).catch(() => {});
-  await rememberNeverAsk();
-  $("status").textContent = "Saving normally, without a password.";
-  closeSoon(800);
+  if (always) await rememberNeverAsk();
+  $("status").textContent = always ? `Saving normally. SecureDL won't ask again for ${site}.` : "Saving normally, without a password.";
+  closeSoon(always ? 1500 : 800);
+}
+$("skip").onclick = () => saveNormally(false);
+$("never").onclick = (e) => { e.preventDefault(); saveNormally(true); };
+
+// ---------- Fallback: let Chrome finish the download, then lock the file it saved ----------
+const waitComplete = (id) => new Promise((resolve) => {
+  const tick = async () => {
+    const [d] = await chrome.downloads.search({ id });
+    if (!d || d.state !== "in_progress") return resolve(d);
+    setTimeout(tick, 400);
+  };
+  tick();
+});
+$("pickStart").onclick = async () => {
+  $("pickStart").disabled = true;
+  let [d] = await chrome.downloads.search({ id: dlId });
+  if (d?.state === "in_progress") {
+    $("pickHint").textContent = "Finishing the download…";
+    await chrome.downloads.resume(dlId).catch(() => {});
+    d = await waitComplete(dlId);
+  }
+  if (!d || d.state !== "complete" || !d.exists) {
+    $("pickHint").textContent = "The download didn't finish, so there is nothing to lock. Nothing was saved.";
+    return;
+  }
+  const parts = d.filename.split(/[\\/]/);
+  $("pickName").textContent = parts.pop(); $("pickDir").textContent = parts.join("/") || "your Downloads folder";
+  $("pickHint").textContent = "Download finished.";
+  $("pickStart").hidden = true; $("pickFileWrap").hidden = false;
+};
+$("pickFile").onchange = async () => {
+  const f = $("pickFile").files[0];
+  const [d] = await chrome.downloads.search({ id: dlId });
+  if (!f || !d) return;
+  // Make sure the picked file is the one that was downloaded before deleting anything.
+  const expectName = d.filename.split(/[\\/]/).pop();
+  if (f.name !== expectName || f.size !== d.fileSize) {
+    $("status").textContent = `❌ That's not the downloaded file. Please pick “${expectName}”.`;
+    return;
+  }
+  const pw = $("pw").value, check = checkPassword(pw, $("pw2").value);
+  if (check.error) return ($("status").textContent = check.error + " (Enter the password above first.)");
+  $("status").textContent = "Encrypting and test-opening…";
+  try {
+    const saved = await saveEncrypted(await encryptFile(f, f.name, pw));
+    await chrome.downloads.removeFile(dlId).catch(() => {});
+    await chrome.downloads.erase({ id: dlId }).catch(() => {});
+    $("status").textContent = "✅ Saved " + saved + ". The unprotected copy was deleted.";
+    closeSoon(2500);
+  } catch (e) { $("status").textContent = "❌ " + e.message + " Nothing was saved."; }
 };
 $("allow").onclick = async () => {
   const granted = await chrome.permissions.request({ origins: [origin + "/*"] });
