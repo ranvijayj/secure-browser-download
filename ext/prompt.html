@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>SecureDL – Download with password</title>
+<link rel="icon" href="icons/32.png">
+<link rel="stylesheet" href="style.css"></head>
+<body>
+  <h2><img src="icons/48.png" alt="" class="logo"> Download with password</h2>
+  <p class="src" id="src"></p>
+  <label for="pw">Password <span class="hint">(at least 8 characters, you'll need it to open the file)</span></label>
+  <div class="pwrow"><input type="password" id="pw" autofocus autocomplete="new-password">
+  <button type="button" id="eye" class="secondary" title="Show password" aria-label="Show password">👁</button></div>
+  <button id="go">Encrypt &amp; save</button>
+  <p id="status" role="status"></p>
+  <div id="access" class="box" hidden>
+    SecureDL needs permission to download from <b id="accessHost"></b>.
+    <button id="allow">Allow for this site</button>
+  </div>
+  <div id="fallback" class="box hint" hidden>
+    <b>Workaround:</b> download the file normally, then click the SecureDL icon in the toolbar,
+    choose <i>Lock a file already on disk</i>, and delete the unlocked original afterwards.
+  </div>
+  <p class="foot">Encrypted on this device. Nothing is uploaded. If you forget the password, the file can't be recovered.</p>
+<script src="lib/pdf-lib.min.js"></script>
+<script src="crypto.js"></script>
+<script src="prompt.js"></script>
+</body></html>

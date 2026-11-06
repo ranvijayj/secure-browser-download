@@ -1,0 +1,20 @@
+{
+  "name": "securedl",
+  "version": "1.0.0",
+  "description": "Chrome extension: save downloads password-protected, 100% locally.",
+  "scripts": {
+    "test": "node test/test.mjs && node test/e2e.mjs",
+    "test:unit": "node test/test.mjs",
+    "test:e2e": "node test/e2e.mjs",
+    "build": "./build.sh",
+    "screenshots": "node tools/screenshots.mjs"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@cantoo/pdf-lib": "^2.11.1"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.65.0"
+  },
+  "private": true
+}

@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="style.css"></head>
+<body class="popup">
+  <h2><img src="icons/32.png" alt="" class="logo"> SecureDL</h2>
+  <p class="hint">Right-click any link → <b>Download with password</b>.</p>
+  <label class="row"><input type="checkbox" id="all"> Protect <b>every</b> download</label>
+  <p class="hint" id="allhint">Asks for a password on every download. Needs access to all sites so it can fetch the files.</p>
+  <hr>
+  <p><b>Lock a file already on disk</b></p>
+  <input type="file" id="file">
+  <label for="pw">Password</label>
+  <input type="password" id="pw" autocomplete="new-password">
+  <button id="go">Encrypt &amp; save</button>
+  <p id="status" role="status"></p>
+<script src="lib/pdf-lib.min.js"></script>
+<script src="crypto.js"></script>
+<script src="popup.js"></script>
+</body></html>

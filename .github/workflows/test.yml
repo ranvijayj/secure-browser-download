@@ -1,0 +1,18 @@
+name: test
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: sudo apt-get update && sudo apt-get install -y qpdf
+      - uses: browser-actions/setup-chrome@v1
+        id: chrome
+      - run: sudo ln -sf "${{ steps.chrome.outputs.chrome-path }}" /usr/bin/google-chrome
+      - run: npm ci
+      - run: npm test
+      - run: ./build.sh
+      - uses: actions/upload-artifact@v4
+        with: { name: store-zip, path: dist/*.zip }
