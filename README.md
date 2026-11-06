@@ -2,7 +2,7 @@
 
 # SecureDL
 
-**Downloads that arrive already locked.** A Chrome extension that saves sensitive downloads, like bank statements, tax forms and ID scans, password-protected. The unprotected file never touches your disk. Everything runs locally.
+**Downloads that arrive already locked.** A Chrome extension that saves sensitive downloads, like bank statements, tax forms and ID scans, password-protected. It can spot them automatically and ask, or you can right-click any link. Everything runs locally.
 
 ![SecureDL](store/screenshot-1.png)
 
@@ -10,7 +10,7 @@
 
 On a Mac, the usual routine is: download the PDF, open it in Preview, File → Export, tick *Encrypt*, type a password, save, then delete the original. Most people skip it, and the files sit unprotected in Downloads, or sync to iCloud Drive or Google Drive.
 
-SecureDL turns that into one step: right-click → **Download with password**.
+SecureDL turns that into one step. When a document starts downloading, it pauses it and asks whether to lock it. Or you can right-click any link → **Download with password**.
 
 ## How the files open (nothing to install)
 
@@ -30,19 +30,36 @@ Try it: `samples/` has one of each. The password is `test1234`.
 
 ## Use
 
-- Right-click a link, image or video → **Download with password**.
-- Toolbar icon → **Protect every download** to route every download through SecureDL.
-- Toolbar icon → **Lock a file already on disk**.
+- **Automatic:** toolbar icon → *When a download starts* →
+  - **Ask me for documents & images** (PDF, Office, CSV, images, archives…), or
+  - **Ask me for every download**.
+
+  The download pauses and a "Lock this download?" tab opens. Choose **Encrypt & save** or **Save normally**. Tick "Don't ask again for this site" for sites you trust. If you close the tab without choosing, the download resumes.
+- **Right-click** any link, image or video → **Download with password**.
+- **Toolbar icon → Lock a file already on disk.**
+
+## Checks before anything is saved
+
+| Check | What happens |
+|---|---|
+| Password and confirmation match, at least 8 characters, no leading or trailing spaces | Blocked until fixed |
+| Common, repeated or all-digit passwords | Warning; press again to use it anyway |
+| Site returned a bot-check (Cloudflare), login, error or empty page instead of the file | Refused, nothing saved |
+| A "document" that is really a program (Windows/Mac/Linux executable named `.pdf`, `.jpg`…) | Refused, nothing saved |
+| File larger than 1 GB (everything is processed in memory) | Refused with a clear message |
+| **Self-check:** the encrypted output is opened again with your password. A PDF must not open without the password and must keep its page count. A `.locked.html` file must decrypt to exactly the original bytes (SHA-256) and filename. | If any of this fails, nothing is saved |
+| A file with the same name already exists | Saved as `name (1)…`, never overwritten |
+| Automatic mode: the original finished downloading before it could be paused (very small files) | You're warned, and after locking, the unprotected copy is deleted from disk |
 
 ## Security model
 
 - **Local only.** No servers, accounts, analytics or remote code. See [PRIVACY.md](PRIVACY.md).
-- **Minimal permissions.** No website access at install. A right-click gives temporary access to that one tab (`activeTab`). Other sites are requested one at a time if needed, and all sites only if you turn on "Protect every download".
+- **Minimal permissions.** No website access at install. A right-click gives temporary access to that one tab (`activeTab`). Other sites are requested one at a time if needed, and all sites only if you turn on automatic detection.
 - **Fetches like the page does.** The file is fetched from inside the tab you right-clicked in, so sign-ins and bot checks (for example Cloudflare) behave as they do for a normal download.
 - **Refuses junk.** If a site returns a bot-check, login, error or empty page instead of the file, nothing is saved.
 - **No recovery.** There is no backdoor and no password reset. Lose the password and the file is gone. Use a password manager.
 
-What it does **not** protect against: malware on your computer, or someone watching you type the password. The file is held in memory unencrypted while it's being encrypted. Encryption also adds no protection once you unlock and save the original somewhere.
+What it does **not** protect against: malware on your computer, or someone watching you type the password. The file is held in memory unencrypted while it's being encrypted. Encryption also adds no protection once you unlock and save the original somewhere. In automatic mode, Chrome may have written the first part of the file to a temporary `.crdownload` file before the pause. That partial file is deleted when you choose Lock.
 
 ## Limitations
 
@@ -59,7 +76,14 @@ npm run build     # dist/securedl-<version>.zip, ready for the Chrome Web Store
 npm run screenshots
 ```
 
-The end-to-end suite loads the extension into Chrome and types passwords with real keystrokes. It runs against a local server that imitates a Cloudflare-protected PDF, a login page and an image. It also checks that the shipped manifest requests no site access up front.
+The end-to-end suite loads the extension into Chrome and types passwords with real keystrokes. It runs against a local server that imitates a Cloudflare-protected PDF, a login page, an image, and slow, instant and fake (`MZ`) downloads. For automatic detection it checks:
+- the download pauses, and choosing Lock leaves no unprotected file on disk.
+- Save normally resumes the download.
+- installers are ignored in documents-only mode.
+- "don't ask again" is respected.
+- closing the tab resumes the download.
+
+It also checks that the shipped manifest requests no site access up front.
 
 ## License
 

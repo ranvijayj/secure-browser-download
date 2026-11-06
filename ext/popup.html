@@ -3,13 +3,22 @@
 <body class="popup">
   <h2><img src="icons/32.png" alt="" class="logo"> SecureDL</h2>
   <p class="hint">Right-click any link → <b>Download with password</b>.</p>
-  <label class="row"><input type="checkbox" id="all"> Protect <b>every</b> download</label>
-  <p class="hint" id="allhint">Asks for a password on every download. Needs access to all sites so it can fetch the files.</p>
+  <label for="mode"><b>When a download starts</b></label>
+  <select id="mode">
+    <option value="off">Do nothing (right-click only)</option>
+    <option value="ask-docs">Ask me for documents &amp; images</option>
+    <option value="ask-all">Ask me for every download</option>
+  </select>
+  <p class="hint" id="modeHint">The download pauses and SecureDL asks whether to lock it. Needs access to all sites so it can fetch the file.</p>
+  <p class="hint" id="neverWrap" hidden>Not asking for: <span id="neverList"></span> · <a href="#" id="neverReset">reset</a></p>
   <hr>
   <p><b>Lock a file already on disk</b></p>
   <input type="file" id="file">
   <label for="pw">Password</label>
   <input type="password" id="pw" autocomplete="new-password">
+  <label for="pw2">Confirm password</label>
+  <input type="password" id="pw2" autocomplete="new-password">
+  <p id="pwWarn" class="warn" hidden></p>
   <button id="go">Encrypt &amp; save</button>
   <p id="status" role="status"></p>
 <script src="lib/pdf-lib.min.js"></script>

@@ -30,6 +30,21 @@ const server = http.createServer((req, res) => {
     if (!cleared || fromExt) { res.writeHead(403, { "content-type": "text/html" }); return res.end(CHALLENGE); }
     res.writeHead(200, { "content-type": "application/pdf" }); return res.end(PDF);
   }
+  if (req.url === "/downloads") {
+    res.writeHead(200, { "content-type": "text/html" });
+    return res.end(["slow-statement.pdf", "slow-report.pdf", "setup.dmg", "tiny.pdf", "fake-invoice.pdf", "slow-other.pdf"]
+      .map((f) => `<a id="${f.split(".")[0]}" href="/dl/${f}" download>${f}</a>`).join("<br>"));
+  }
+  if (req.url.startsWith("/dl/")) {
+    const f = req.url.slice(4);
+    if (f === "fake-invoice.pdf") { const b = Buffer.alloc(2048); b.write("MZ"); res.writeHead(200, { "content-type": "application/pdf" }); return res.end(b); }
+    const body = f.endsWith(".pdf") ? PDF : Buffer.alloc(300000, 7);
+    res.writeHead(200, { "content-type": f.endsWith(".pdf") ? "application/pdf" : "application/x-apple-diskimage",
+      "content-length": body.length, "content-disposition": `attachment; filename="${f}"` });
+    if (!f.startsWith("slow")) return res.end(body);
+    res.write(body.subarray(0, 100));                       // trickle: lets the extension pause it mid-way
+    return setTimeout(() => res.end(body.subarray(100)), 4000);
+  }
   if (req.url === "/login.pdf") { res.writeHead(200, { "content-type": "text/html" }); return res.end("<!doctype html><h1>Please log in</h1>"); }
   if (req.url === "/photo.jpg") { res.writeHead(200, { "content-type": "image/jpeg" }); return res.end(Buffer.from([0xff, 0xd8, 0xff, 1, 2, 3, 4, 5])); }
   res.writeHead(404); res.end();
@@ -74,6 +89,7 @@ async function attempt(file, password, { withTab = true } = {}) {
   await p.click("#pw");
   await p.keyboard.type(password, { delay: 20 });           // real keystrokes
   const typed = await p.$eval("#pw", (e) => e.value);
+  await p.click("#pw2"); await p.keyboard.type(password, { delay: 10 });
   await p.keyboard.press("Enter");
   await p.waitForFunction(() => /✅|❌/.test(document.getElementById("status").textContent), null, { timeout: 30000 });
   const status = await p.$eval("#status", (e) => e.textContent);
@@ -129,6 +145,87 @@ if (r4.newFiles[0]) {
     "vault unlocks in Chrome (typed password) and restores exact photo.jpg");
 }
 
+// ---------- Automatic detection ("ask" mode) ----------
+const setMode = (mode, neverAsk = []) => sw.evaluate(([m, n]) => chrome.storage.local.set({ mode: m, neverAsk: n }), [mode, neverAsk]);
+const dlState = (name) => sw.evaluate(async (n) => (await chrome.downloads.search({}))
+  .filter((d) => d.url.endsWith("/dl/" + n)).map((d) => ({ state: d.state, exists: d.exists, paused: d.paused, file: d.filename })), name);
+const dlPage = await ctx.newPage(); await dlPage.goto(base + "/downloads");
+const askTab = () => ctx.waitForEvent("page", { predicate: (pg) => pg.url().includes("ask=1"), timeout: 8000 }).catch(() => null);
+async function lockIn(p, pw = "tangerine-kayak-41") {
+  const dls = []; p.on("download", (d) => dls.push(d));
+  await p.evaluate(() => { const o = chrome.downloads.download.bind(chrome.downloads);
+    window.__asked = []; chrome.downloads.download = (x) => { window.__asked.push(x.filename); return o(x); }; });
+  await p.fill("#pw", pw); await p.fill("#pw2", pw); await p.click("#go");
+  await p.waitForFunction(() => /✅|❌/.test(document.getElementById("status").textContent), null, { timeout: 30000 });
+  const out = { status: await p.$eval("#status", (e) => e.textContent), asked: await p.evaluate(() => window.__asked) };
+  await new Promise((r) => setTimeout(r, 1800));
+  return out;
+}
+
+await setMode("ask-docs");
+// A. slow PDF -> paused, asked, locked; original cancelled and removed
+let tabP = askTab(); await dlPage.click("#slow-statement");
+let ask = await tabP;
+ok(!!ask, "ask mode: download of a PDF opens the 'Lock this download?' tab");
+if (ask) {
+  await ask.waitForLoadState();
+  ok((await ask.$eval("#askName", (e) => e.textContent)).includes("slow-statement"), "ask tab names the file");
+  const paused = (await dlState("slow-statement.pdf"))[0];
+  ok(paused?.paused === true, "original download is paused while asking");
+  const r = await lockIn(ask);
+  ok(r.status.includes("✅") && r.asked[0] === "slow-statement (locked).pdf", "chose Lock: saved " + r.asked[0]);
+  const st = await dlState("slow-statement.pdf");
+  ok((st.length === 0 || st.every((d) => d.state !== "complete")) && !(paused?.file && fs.existsSync(paused.file)),
+    "unprotected original was cancelled and nothing is left on disk");
+}
+// B. slow PDF -> Save normally -> resumes and completes
+tabP = askTab(); await dlPage.click("#slow-report");
+ask = await tabP;
+if (ask) {
+  await ask.waitForLoadState(); await ask.click("#skip");
+  await new Promise((r) => setTimeout(r, 6000));
+  const st = await dlState("slow-report.pdf");
+  ok(st[0]?.state === "complete", "chose Save normally: original download resumed and completed");
+} else ok(false, "ask tab for slow-report.pdf");
+// C. installer is ignored in documents-only mode
+tabP = askTab(); await dlPage.click("#setup");
+ok(!(await tabP), "documents-only mode ignores a .dmg installer");
+// D. tiny file finishes before pause -> lock deletes the plaintext copy from disk
+tabP = askTab(); await dlPage.click("#tiny");
+ask = await tabP;
+if (ask) {
+  await ask.waitForLoadState(); await new Promise((r) => setTimeout(r, 800));
+  const before = await dlState("tiny.pdf");
+  const plainPath = before[0]?.file;
+  ok(before[0]?.state === "complete" && plainPath && fs.existsSync(plainPath) && await ask.$eval("#askDone", (e) => !e.hidden),
+    "tiny file finished before pause; the ask tab warns about it");
+  const r = await lockIn(ask);
+  ok(r.status.includes("✅") && !fs.existsSync(plainPath), "after locking, the unprotected file is gone from disk: " + plainPath);
+} else ok(false, "ask tab for tiny.pdf");
+// E. program disguised as a PDF is refused
+tabP = askTab(); await dlPage.click("#fake-invoice");
+ask = await tabP;
+if (ask) {
+  await ask.waitForLoadState(); const r = await lockIn(ask);
+  ok(r.status.includes("actually a program") && r.asked.length === 0, "disguised program refused: " + r.status.trim());
+  await ask.close();
+} else ok(false, "ask tab for fake-invoice.pdf");
+// F. "don't ask again for this site" is respected
+await setMode("ask-docs", [new URL(base).host]);
+tabP = askTab(); await dlPage.click("#slow-other");
+ok(!(await tabP), "'Don't ask again' site is not asked about");
+// G. closing the ask tab without choosing resumes the download
+await setMode("ask-all");
+await sw.evaluate(() => chrome.downloads.erase({}));
+tabP = askTab(); await dlPage.click("#slow-other");
+ask = await tabP;
+if (ask) {
+  await ask.waitForLoadState(); await new Promise((r) => setTimeout(r, 500)); await ask.close();
+  await new Promise((r) => setTimeout(r, 6000));
+  ok((await dlState("slow-other.pdf"))[0]?.state === "complete", "closing the ask tab resumes the paused download");
+} else ok(false, "ask tab for slow-other.pdf (ask-all)");
+await setMode("off");
+
 await ctx.close();
 
 // 7. Real manifest (no blanket access): extension asks for this one site, saves nothing.
@@ -145,7 +242,7 @@ await ctx.close();
   const p = await c2.newPage();
   const dls = []; p.on("download", (d) => dls.push(d));
   await p.goto(`chrome-extension://${id2}/prompt.html?` + new URLSearchParams({ url: base + "/protected.pdf", tabId: "" }));
-  await p.click("#pw"); await p.keyboard.type("hunter22"); await p.keyboard.press("Enter");
+  await p.click("#pw"); await p.keyboard.type("hunter22"); await p.fill("#pw2", "hunter22"); await p.keyboard.press("Enter");
   await p.waitForFunction(() => !document.getElementById("access").hidden || /❌|✅/.test(document.getElementById("status").textContent), null, { timeout: 15000 });
   const shown = await p.$eval("#access", (e) => !e.hidden);
   const host = await p.$eval("#accessHost", (e) => e.textContent);

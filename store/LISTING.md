@@ -15,18 +15,25 @@ Save downloads already password-protected. PDFs open in Preview; other files unl
 
 Bank statements, tax forms, ID scans, contracts… They download to your Desktop or Downloads folder with no password, and they stay there.
 
-SecureDL adds "Download with password" to the right-click menu. The file is downloaded into memory, encrypted on your device, and only the locked version is saved. The unprotected file never touches your disk.
+SecureDL spots sensitive downloads as they start, pauses them and asks: lock it with a password? Or right-click any link → "Download with password". The file is downloaded into memory, encrypted on your device, and only the locked version is saved.
 
 HOW IT OPENS (no app to install)
 • PDFs are saved as standard AES-256 password-protected PDFs. Double-click and Preview (Mac), Acrobat or Chrome asks for the password.
 • Every other file type is saved as a self-unlocking .html file (AES-256-GCM, PBKDF2 with 600,000 iterations). Double-click, type the password in your browser, and the original file is restored. Works on Mac, Windows, Linux and phones.
 
 FEATURES
+• Automatic detection: asks when documents & images (or every file) start downloading
+• "Don't ask again" for sites you trust
 • Right-click any link, image or video → Download with password
-• Optional "Protect every download" mode
 • Lock a file that's already on your disk
-• Detects bot-check, login and error pages, so you never get a locked junk file
 • Uses the page you're on to fetch the file, so downloads from sites you're signed in to still work
+
+CHECKED BEFORE SAVING
+• Every locked file is test-opened with your password and compared with the original before it's saved
+• Refuses bot-check, login and error pages, so you never get a locked junk file
+• Refuses programs disguised as documents (e.g. an .exe named invoice.pdf)
+• Password confirmation and weak-password warnings
+• Never overwrites an existing file
 
 PRIVACY
 • Everything happens locally in your browser. No servers, no accounts, no analytics, no tracking.
@@ -47,11 +54,11 @@ Save files the user chooses to download in password-protected (encrypted) form, 
 
 **Permission justifications:**
 - `contextMenus`: adds the "Download with password" item to the right-click menu.
-- `downloads`: saves the encrypted file to the user's Downloads folder; in the optional "Protect every download" mode, cancels the normal download so it can be saved encrypted instead.
+- `downloads`: saves the encrypted file to the user's Downloads folder. If the user turns on automatic detection, it also pauses a starting download while asking whether to lock it, then either resumes it or cancels it and removes the unprotected copy.
 - `activeTab`: when the user right-clicks a link, fetches the file from that tab so the request carries the site's normal sign-in and bot-check state.
 - `scripting`: runs the fetch for that file inside the tab the user right-clicked in (same reason as activeTab). No page content is read or changed.
-- `storage`: remembers whether "Protect every download" is on. No passwords or files are stored.
-- Optional host access (`<all_urls>`), requested at runtime only: per site when a file is hosted on a different site than the page, or for all sites only if the user turns on "Protect every download".
+- `storage`: remembers the detection setting and the user's "don't ask again" site list. No passwords or files are stored.
+- Optional host access (`<all_urls>`), requested at runtime only: per site when a file is hosted on a different site than the page, or for all sites only if the user turns on automatic detection, so the detected file can be fetched for encryption.
 
 **Remote code:** No. All code is bundled in the package.
 

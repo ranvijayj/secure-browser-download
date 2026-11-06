@@ -12,9 +12,11 @@ let [sw] = ctx.serviceWorkers(); if (!sw) sw = await ctx.waitForEvent("servicewo
 const id = sw.url().split("/")[2];
 
 // Real UI captures
-const p = await ctx.newPage(); await p.setViewportSize({ width: 560, height: 330 });
-await p.goto(`chrome-extension://${id}/prompt.html?url=` + encodeURIComponent("https://mybank.example/statements/2026-10.pdf"));
-await p.fill("#pw", "correct horse battery"); await p.$eval("#status", (e) => (e.textContent = "✅ Saved 2026-10 (locked).pdf"));
+const p = await ctx.newPage(); await p.setViewportSize({ width: 560, height: 380 });
+await p.goto(`chrome-extension://${id}/prompt.html?` + new URLSearchParams({ url: "https://mybank.example/statements/2026-10.pdf",
+  ask: "1", dlId: "999999", name: "Statement-2026-10.pdf", site: "mybank.example" }));
+await p.fill("#pw", "correct horse battery"); await p.fill("#pw2", "correct horse battery");
+await p.evaluate(() => { document.getElementById("src").hidden = true; document.querySelector(".foot").hidden = true; });
 await p.evaluate(() => (document.body.style.margin = "10px auto"));
 const prompt = (await p.screenshot()).toString("base64");
 const q = await ctx.newPage(); await q.setViewportSize({ width: 340, height: 420 });
@@ -37,8 +39,8 @@ await shot(frame(`
     <div style="flex:0 0 520px">
       <img src="data:image/png;base64,${icon}" style="width:84px">
       <h1 style="font-size:48px;line-height:1.12;margin:24px 0 18px;white-space:nowrap">Downloads that arrive<br>already locked.</h1>
-      <p style="font-size:22px;opacity:.9;line-height:1.5">Right-click any link → <b>Download with password</b>.<br>
-      The unprotected file never touches your disk.</p>
+      <p style="font-size:21px;opacity:.92;line-height:1.55;white-space:nowrap">Spots sensitive downloads, pauses them,<br>and asks to <b>lock them with a password</b>.<br>
+      Or right-click any link → <b>Download with password</b>.</p>
     </div>${card(prompt, 600)}</div>`), "screenshot-1.png");
 
 await shot(frame(`
@@ -47,12 +49,12 @@ await shot(frame(`
     <div style="display:flex;gap:36px">
       ${[["📄", "PDFs", "Saved as an AES-256 password-protected PDF. Preview, Acrobat and Chrome ask for the password."],
          ["🗂️", "Everything else", "Saved as a self-unlocking .html file (AES-256-GCM). Opens in any browser on Mac, Windows or phone."],
-         ["🛡️", "100% local", "Encrypted on your device. No servers, no accounts, no analytics. Open source."]]
+         ["🛡️", "Checked before saving", "Every file is test-opened with your password first. Fake documents and login pages are refused. 100% local, open source."]]
         .map(([e, t, d]) => `<div style="flex:1;background:rgba(255,255,255,.12);border-radius:20px;padding:36px">
           <div style="font-size:56px">${e}</div><h2 style="font-size:30px;margin:18px 0 12px">${t}</h2>
           <p style="font-size:21px;line-height:1.45;opacity:.92;margin:0">${d}</p></div>`).join("")}
     </div>
-    <p style="font-size:20px;opacity:.85;margin-top:44px">Also: lock files already on disk, or turn on <b>Protect every download</b>.</p>
+    <p style="font-size:20px;opacity:.85;margin-top:44px">Also: lock files already on disk, from the toolbar button.</p>
   </div>`), "screenshot-2.png");
 
 await shot(frame(`<div style="display:flex;align-items:center;gap:22px;padding:0 34px;height:280px">

@@ -3,12 +3,24 @@
 <link rel="icon" href="icons/32.png">
 <link rel="stylesheet" href="style.css"></head>
 <body>
-  <h2><img src="icons/48.png" alt="" class="logo"> Download with password</h2>
+  <h2><img src="icons/48.png" alt="" class="logo"> <span id="title">Download with password</span></h2>
+  <div id="askInfo" class="box" hidden>
+    <div><b id="askName"></b></div>
+    <div class="hint">from <span id="askSite"></span> · download paused</div>
+    <div id="askDone" class="hint" hidden>⚠ It finished downloading before it could be paused. If you lock it, the unprotected copy is deleted.</div>
+  </div>
   <p class="src" id="src"></p>
   <label for="pw">Password <span class="hint">(at least 8 characters, you'll need it to open the file)</span></label>
   <div class="pwrow"><input type="password" id="pw" autofocus autocomplete="new-password">
-  <button type="button" id="eye" class="secondary" title="Show password" aria-label="Show password">👁</button></div>
-  <button id="go">Encrypt &amp; save</button>
+  <button type="button" id="eye" class="secondary" title="Show passwords" aria-label="Show passwords">👁</button></div>
+  <label for="pw2">Confirm password</label>
+  <input type="password" id="pw2" autocomplete="new-password">
+  <p id="pwWarn" class="warn" hidden></p>
+  <div class="actions">
+    <button id="go">Encrypt &amp; save</button>
+    <button id="skip" class="secondary" hidden>Save normally (no password)</button>
+  </div>
+  <label class="row hint" id="neverRow" hidden><input type="checkbox" id="never"> Don't ask again for <span id="neverSite"></span></label>
   <p id="status" role="status"></p>
   <div id="access" class="box" hidden>
     SecureDL needs permission to download from <b id="accessHost"></b>.
@@ -18,7 +30,7 @@
     <b>Workaround:</b> download the file normally, then click the SecureDL icon in the toolbar,
     choose <i>Lock a file already on disk</i>, and delete the unlocked original afterwards.
   </div>
-  <p class="foot">Encrypted on this device. Nothing is uploaded. If you forget the password, the file can't be recovered.</p>
+  <p class="foot">Encrypted on this device. Nothing is uploaded. Every file is test-opened with your password before it's saved. If you forget the password, the file can't be recovered.</p>
 <script src="lib/pdf-lib.min.js"></script>
 <script src="crypto.js"></script>
 <script src="prompt.js"></script>

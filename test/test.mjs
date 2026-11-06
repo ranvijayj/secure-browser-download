@@ -69,6 +69,40 @@ ok((await ctx.checkDownload(pdfIn, "application/pdf", u)) === null, "accepts a r
 ok((await ctx.checkDownload(new Blob(["<html>hi</html>"]), "text/html", "https://x.com/page.html")) === null, "accepts a real .html download");
 ok((await ctx.checkDownload(new Blob([]), "application/octet-stream", "https://x.com/a.bin"))?.reason === "empty", "rejects empty download");
 
+// ---------- 2c. Password checks ----------
+const pc = (pw, c) => ctx.checkPassword(pw, c === undefined ? pw : c);
+ok(pc("short1").error, "rejects passwords under 8 characters");
+ok(pc("correct-horse", "correct-hose").error?.includes("match"), "rejects mismatched confirmation");
+ok(pc(" padded-pass ").error, "rejects leading/trailing spaces");
+ok(pc("password123").warning && pc("aaaaaaaaaa").warning && pc("19870412").warning, "warns on common / repeated / all-digit passwords");
+ok(pc("abcdefgh").warning, "warns on short letters-only password");
+ok(!pc("tangerine-kayak-41").warning && !pc("tangerine-kayak-41").error, "accepts a strong password");
+
+// ---------- 2d. Disguised programs, size limit ----------
+const exe = new Uint8Array(64); exe.set([0x4d, 0x5a]);   // Windows "MZ" header
+ok((await ctx.checkDownload(new Blob([exe]), "application/pdf", "https://x.com/invoice.pdf"))?.reason === "disguised", "refuses a Windows program disguised as .pdf");
+const macho = new Uint8Array(64); macho.set([0xcf, 0xfa, 0xed, 0xfe]);
+ok((await ctx.checkDownload(new Blob([macho]), "image/jpeg", "https://x.com/photo.jpg"))?.reason === "disguised", "refuses a Mac program disguised as .jpg");
+ok((await ctx.checkDownload(new Blob([exe]), "application/octet-stream", "https://x.com/setup.exe")) === null, "allows a real .exe that says it's an .exe");
+vm.runInContext("MAX_BYTES = 1000", ctx);
+let tooBig = null; try { await ctx.encryptFile(new Blob([new Uint8Array(2000)]), "big.bin", "tangerine-kayak-41"); } catch (e) { tooBig = e.message; }
+ok(tooBig && /handles files up to/.test(tooBig), "refuses files over the size limit: " + tooBig);
+vm.runInContext("MAX_BYTES = 1024 * 1024 * 1024", ctx);
+
+// ---------- 2e. Self-check catches broken output ----------
+const goodVault = await ctx.encryptToHtml(new Blob(["hello"]), "a.txt", "tangerine-kayak-41");
+const helloHash = await ctx.sha256(new TextEncoder().encode("hello"));
+let caught;
+const tampered = new Blob([(await goodVault.text()).replace(/D="([A-Za-z0-9+/])/, (m, c) => 'D="' + (c === "A" ? "B" : "A"))]);
+caught = null; try { await ctx.verifyVault(tampered, "tangerine-kayak-41", "a.txt", helloHash); } catch (e) { caught = e; }
+ok(caught, "self-check rejects a corrupted vault");
+caught = null; try { await ctx.verifyVault(goodVault, "tangerine-kayak-41", "a.txt", await ctx.sha256(new TextEncoder().encode("other"))); } catch (e) { caught = e; }
+ok(caught, "self-check rejects a vault whose contents don't match the original");
+caught = null; try { await ctx.verifyPdf(pdfIn, "tangerine-kayak-41", 1); } catch (e) { caught = e; }
+ok(caught?.message.includes("without a password"), "self-check rejects a PDF that opens without a password");
+caught = null; try { await ctx.verifyPdf(pdfOut.blob, "correct-horse", 5); } catch (e) { caught = e; }
+ok(caught?.message.includes("page count"), "self-check rejects a PDF whose pages changed");
+
 // ---------- 3. Lint: no `onkey… = e => cond && fn()` (returns false => blocks typing) ----------
 for (const f of fs.readdirSync(new URL("../ext", import.meta.url)).filter((f) => f.endsWith(".js") || f.endsWith(".html"))) {
   const src = fs.readFileSync(new URL("../ext/" + f, import.meta.url), "utf8");

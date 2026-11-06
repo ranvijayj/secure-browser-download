@@ -11,10 +11,35 @@ function b64(bytes) {
   return btoa(s);
 }
 
-async function deriveKey(password, salt) {
+// Files are processed in memory; refuse anything bigger than this rather than crash the tab.
+var MAX_BYTES = 1024 * 1024 * 1024; // 1 GiB (var so tests can lower it)
+
+async function deriveKey(password, salt, usage = "encrypt", iterations = KDF_ITER) {
   const base = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveKey"]);
-  return crypto.subtle.deriveKey({ name: "PBKDF2", salt, iterations: KDF_ITER, hash: "SHA-256" },
-    base, { name: "AES-GCM", length: 256 }, false, ["encrypt"]);
+  return crypto.subtle.deriveKey({ name: "PBKDF2", salt, iterations, hash: "SHA-256" },
+    base, { name: "AES-GCM", length: 256 }, false, [usage]);
+}
+
+async function sha256(bytes) {
+  return b64(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)));
+}
+
+// ---------- Password checks ----------
+const COMMON_PASSWORDS = new Set(("password,password1,password123,12345678,123456789,1234567890,qwertyuiop," +
+  "qwerty123,11111111,00000000,iloveyou,welcome1,admin123,letmein1,abc12345,abcd1234,passw0rd,sunshine," +
+  "football,baseball,princess,trustno1,superman,whatever,starwars,1q2w3e4r,zaq12wsx,asdfghjkl,test1234").split(","));
+
+// Returns { error } to block, { warning } to show but allow, or {} if fine.
+function checkPassword(pw, confirm) {
+  if (pw.length < 8) return { error: "Use at least 8 characters." };
+  if (confirm !== undefined && pw !== confirm) return { error: "The two passwords don't match." };
+  if (/^\s|\s$/.test(pw)) return { error: "Remove spaces at the start or end of the password." };
+  const lower = pw.toLowerCase();
+  if (COMMON_PASSWORDS.has(lower) || /^(.)\1+$/.test(pw) || /^\d{8,11}$/.test(pw))
+    return { warning: "This password is very easy to guess. Anyone who gets the file could open it." };
+  if (pw.length < 12 && !(/[a-z]/i.test(pw) && /\d|[^a-z0-9]/i.test(pw)))
+    return { warning: "Fairly weak password. A longer one (or a few random words) is much safer." };
+  return {};
 }
 
 async function isPdf(blob) {
@@ -44,16 +69,54 @@ async function encryptToHtml(blob, name, password) {
   return new Blob([html], { type: "text/html" });
 }
 
-// Returns { blob, filename } ready to save.
+// ---------- Self-check: prove the saved file opens with the password and gives back the original ----------
+async function verifyPdf(outBlob, password, expectedPages) {
+  const bytes = await outBlob.arrayBuffer();
+  let openedWithout = false;
+  try { await PDFLib.PDFDocument.load(bytes, { updateMetadata: false }); openedWithout = true; } catch {}
+  if (openedWithout) throw new Error("self-check: PDF opened without a password");
+  const doc = await PDFLib.PDFDocument.load(bytes, { password, updateMetadata: false });
+  if (doc.getPageCount() !== expectedPages) throw new Error("self-check: page count changed");
+}
+
+async function openVault(html, password) {
+  const get = (re) => (html.match(re) || [])[1];
+  const S = get(/const S="([^"]+)"/), I = get(/I="([^"]+)"/), N = Number(get(/N=(\d+)/)), D = get(/D="([^"]+)"/);
+  const u = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+  const key = await deriveKey(password, u(S), "decrypt", N);
+  const p = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: u(I) }, key, u(D)));
+  const n = new DataView(p.buffer).getUint32(0);
+  return { name: new TextDecoder().decode(p.subarray(4, 4 + n)), data: p.subarray(4 + n) };
+}
+
+async function verifyVault(outBlob, password, name, originalHash) {
+  const html = await outBlob.text();
+  if (html.includes("__DATA__") || !html.includes('const S="')) throw new Error("self-check: vault page is malformed");
+  const back = await openVault(html, password);
+  if (back.name !== name || (await sha256(back.data)) !== originalHash)
+    throw new Error("self-check: unlocked file doesn't match the original");
+}
+
+// Returns { blob, filename } ready to save. Every output is decrypted again and compared
+// with the original before it is returned; if that fails, nothing is saved.
 async function encryptFile(blob, name, password) {
+  if (blob.size > MAX_BYTES)
+    throw new Error(`This file is ${(blob.size / 1048576).toFixed(0)} MB. SecureDL handles files up to ${MAX_BYTES / 1048576} MB.`);
   const safe = name.replace(/[\\/:*?"<>|]/g, "_");
   if (await isPdf(blob)) {
-    try {
-      const base = safe.replace(/\.pdf$/i, "");
-      return { blob: await encryptPdf(blob, password), filename: base + " (locked).pdf" };
-    } catch (e) { console.warn("PDF encrypt failed, using HTML vault", e); }
+    let pages = null;
+    try { pages = (await PDFLib.PDFDocument.load(await blob.arrayBuffer(), { updateMetadata: false })).getPageCount(); }
+    catch (e) { console.warn("PDF can't be parsed (already encrypted or damaged); using HTML vault", e); }
+    if (pages !== null) {
+      const out = await encryptPdf(blob, password);
+      await verifyPdf(out, password, pages);
+      return { blob: out, filename: safe.replace(/\.pdf$/i, "") + " (locked).pdf", kind: "pdf" };
+    }
   }
-  return { blob: await encryptToHtml(blob, name, password), filename: safe + ".locked.html" };
+  const originalHash = await sha256(new Uint8Array(await blob.arrayBuffer()));
+  const out = await encryptToHtml(blob, name, password);
+  await verifyVault(out, password, name, originalHash);
+  return { blob: out, filename: safe + ".locked.html", kind: "html" };
 }
 
 // Did we actually get the file, or a bot-check / login / error page instead?
@@ -63,6 +126,14 @@ async function checkDownload(blob, contentType, url) {
   const isHtml = /text\/html/i.test(contentType || "") || /^\s*(<!doctype html|<html)/i.test(head);
   let ext = "";
   try { ext = (new URL(url).pathname.match(/\.([a-z0-9]{1,5})$/i) || [])[1]?.toLowerCase() || ""; } catch {}
+  // A "document" that is really a program (Windows .exe, Mac/Linux binary) is a classic trick.
+  const DOC_EXT = ["pdf", "doc", "docx", "xls", "xlsx", "csv", "ppt", "pptx", "txt", "rtf", "jpg", "jpeg", "png", "gif", "heic"];
+  const magic = new Uint8Array(await blob.slice(0, 4).arrayBuffer());
+  const hex = [...magic].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const isProgram = hex.startsWith("4d5a") || hex === "7f454c46" ||
+    ["feedface", "feedfacf", "cefaedfe", "cffaedfe", "cafebabe"].includes(hex);
+  if (isProgram && DOC_EXT.includes(ext))
+    return { reason: "disguised", message: `This file claims to be a .${ext} but is actually a program. It was not saved.` };
   if (/challenge-platform|cf_chl_|cf-chl|Just a moment\.\.\.|captcha/i.test(head) && isHtml)
     return { reason: "challenge", message: "The site showed a bot check (e.g. Cloudflare) instead of the file." };
   if (ext === "pdf" && !head.includes("%PDF-"))
@@ -85,7 +156,8 @@ function nameFromUrl(url, contentDisposition) {
 
 async function saveEncrypted({ blob, filename }) {
   const url = URL.createObjectURL(blob);
-  await chrome.downloads.download({ url, filename, saveAs: false });
+  // uniquify: never overwrite an existing file with the same name.
+  await chrome.downloads.download({ url, filename, saveAs: false, conflictAction: "uniquify" });
   setTimeout(() => URL.revokeObjectURL(url), 60000);
   return filename;
 }

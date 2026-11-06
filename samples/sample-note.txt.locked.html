@@ -8,7 +8,7 @@ button{padding:10px 18px;background:#1a73e8;color:#fff;border:0;border-radius:6p
 <p>Enter the password to unlock it. Nothing is uploaded; it is decrypted on this device.</p>
 <input type="password" id="p" autofocus placeholder="Password"><button id="b">Unlock</button><div id="m"></div>
 <script>
-const S="ZSkoMBki6E86vgAuXzsJWg==",I="HjcD5OeW5jauP/6d",N=600000,D="SJPfgBQ06LrgsSPK2A3ijSiDBz+BB0Z+7KX24c9+dgEnxV24hAzTBnRKsrvrL8oKNSsCxfLrFyTHR9bzCY5JNWyfrrR9JGIzgQWAspijW8/Ispxv6Q==";
+const S="72k59Ow8OMpv7iXY9AK9CQ==",I="8b/HUT0SXeFBKlkt",N=600000,D="BhUlRmba+45jn3kRlXmR/Jd7IYl0LB6A5u615LH/1PXVBzdnyiI7okbRQF5VISC+Z0m5fg1XJcn897b5Af6o450UI/ocEAWPsgeQAo0puU7NkJ73Lw==";
 const u=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
 async function go(){const m=document.getElementById("m");m.textContent="Unlocking…";
 try{const k0=await crypto.subtle.importKey("raw",new TextEncoder().encode(document.getElementById("p").value),"PBKDF2",false,["deriveKey"]);
