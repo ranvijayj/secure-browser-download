@@ -6,7 +6,7 @@ name: release
 on:
   push:
     branches: [main]
-    paths: ["ext/manifest.json", "RELEASE_NOTES.md"]
+    paths: ["ext/manifest.json", "RELEASE_NOTES.md", ".github/workflows/release.yml"]
   workflow_dispatch:
 permissions:
   contents: write
