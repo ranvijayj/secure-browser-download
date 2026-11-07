@@ -26,7 +26,16 @@ Try it: `samples/` has one of each. The password is `test1234`.
 ## Install
 
 - **Chrome Web Store:** _coming soon_
+- **Power users (now):**
+  1. Download `SecureDL-vX.Y.Z.zip` from [Releases](https://github.com/ranvijayj/secure-browser-download/releases/latest) and unzip it.
+  2. Go to `chrome://extensions` and turn on **Developer mode**.
+  3. Click **Load unpacked** and select the unzipped folder.
 - **From source:** `git clone https://github.com/ranvijayj/secure-browser-download` → `chrome://extensions` → turn on Developer mode → **Load unpacked** → select `ext/`.
+
+### Releasing a new version
+1. Bump `version` in `ext/manifest.json` (and `package.json`) and update `RELEASE_NOTES.md`.
+2. Commit, then `git tag vX.Y.Z && git push origin main vX.Y.Z`.
+3. GitHub Actions runs the tests and publishes the release with the zip. Upload the same zip to the Chrome Web Store.
 
 ## Use
 

@@ -1,0 +1,31 @@
+name: release
+# Push a tag like v1.4.0 -> tests run -> a GitHub Release is published with the
+# ready-to-load zip (manifest at the root), for "Load unpacked" and for the Chrome Web Store.
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: sudo apt-get update && sudo apt-get install -y qpdf
+      - uses: browser-actions/setup-chrome@v1
+        id: chrome
+      - run: sudo ln -sf "${{ steps.chrome.outputs.chrome-path }}" /usr/bin/google-chrome
+      - run: npm ci
+      - run: npm test
+      - name: Check tag matches manifest version
+        run: |
+          V=$(node -p "require('./ext/manifest.json').version")
+          [ "v$V" = "${GITHUB_REF_NAME}" ] || { echo "Tag ${GITHUB_REF_NAME} != manifest v$V"; exit 1; }
+      - run: ./build.sh && cp dist/securedl-*.zip "dist/SecureDL-${GITHUB_REF_NAME}.zip"
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: SecureDL ${{ github.ref_name }}
+          body_path: RELEASE_NOTES.md
+          files: dist/SecureDL-${{ github.ref_name }}.zip
