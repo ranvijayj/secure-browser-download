@@ -1,9 +1,13 @@
 name: release
-# Push a tag like v1.4.0 -> tests run -> a GitHub Release is published with the
-# ready-to-load zip (manifest at the root), for "Load unpacked" and for the Chrome Web Store.
+# When a push to main carries a version that has no release yet (ext/manifest.json),
+# tests run and a GitHub Release vX.Y.Z is published with the ready-to-load zip
+# (manifest at the zip root), for "Load unpacked" and for the Chrome Web Store.
+# Also runnable by hand: Actions -> release -> Run workflow.
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
+    paths: ["ext/manifest.json", "RELEASE_NOTES.md"]
+  workflow_dispatch:
 permissions:
   contents: write
 jobs:
@@ -11,21 +15,32 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 22 }
-      - run: sudo apt-get update && sudo apt-get install -y qpdf
-      - uses: browser-actions/setup-chrome@v1
-        id: chrome
-      - run: sudo ln -sf "${{ steps.chrome.outputs.chrome-path }}" /usr/bin/google-chrome
-      - run: npm ci
-      - run: npm test
-      - name: Check tag matches manifest version
+      - name: Version from manifest; skip if already released
+        id: v
+        env: { GH_TOKEN: "${{ github.token }}" }
         run: |
-          V=$(node -p "require('./ext/manifest.json').version")
-          [ "v$V" = "${GITHUB_REF_NAME}" ] || { echo "Tag ${GITHUB_REF_NAME} != manifest v$V"; exit 1; }
-      - run: ./build.sh && cp dist/securedl-*.zip "dist/SecureDL-${GITHUB_REF_NAME}.zip"
-      - uses: softprops/action-gh-release@v2
+          V="v$(node -p "require('./ext/manifest.json').version")"
+          echo "tag=$V" >> "$GITHUB_OUTPUT"
+          if gh release view "$V" >/dev/null 2>&1; then echo "exists=true" >> "$GITHUB_OUTPUT"; echo "$V already released"; fi
+      - if: steps.v.outputs.exists != 'true'
+        uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - if: steps.v.outputs.exists != 'true'
+        run: sudo apt-get update && sudo apt-get install -y qpdf
+      - if: steps.v.outputs.exists != 'true'
+        uses: browser-actions/setup-chrome@v1
+        id: chrome
+      - if: steps.v.outputs.exists != 'true'
+        run: sudo ln -sf "${{ steps.chrome.outputs.chrome-path }}" /usr/bin/google-chrome
+      - if: steps.v.outputs.exists != 'true'
+        run: npm ci && npm test
+      - if: steps.v.outputs.exists != 'true'
+        run: ./build.sh && cp dist/securedl-*.zip "dist/SecureDL-${{ steps.v.outputs.tag }}.zip"
+      - if: steps.v.outputs.exists != 'true'
+        uses: softprops/action-gh-release@v2
         with:
-          name: SecureDL ${{ github.ref_name }}
+          tag_name: ${{ steps.v.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: SecureDL ${{ steps.v.outputs.tag }}
           body_path: RELEASE_NOTES.md
-          files: dist/SecureDL-${{ github.ref_name }}.zip
+          files: dist/SecureDL-${{ steps.v.outputs.tag }}.zip

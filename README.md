@@ -34,8 +34,8 @@ Try it: `samples/` has one of each. The password is `test1234`.
 
 ### Releasing a new version
 1. Bump `version` in `ext/manifest.json` (and `package.json`) and update `RELEASE_NOTES.md`.
-2. Commit, then `git tag vX.Y.Z && git push origin main vX.Y.Z`.
-3. GitHub Actions runs the tests and publishes the release with the zip. Upload the same zip to the Chrome Web Store.
+2. Commit and push to `main`. GitHub Actions sees the new version, runs the tests, and publishes release `vX.Y.Z` with the zip. To do it by hand, go to **Actions → release → Run workflow**.
+3. Upload the same zip to the Chrome Web Store.
 
 ## Use
 
