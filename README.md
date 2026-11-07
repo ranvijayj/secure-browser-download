@@ -17,7 +17,11 @@ SecureDL turns that into one step. When a document starts downloading, it stops 
 | Downloaded file | Saved as | Opens with |
 |---|---|---|
 | PDF | `name (locked).pdf`, standard AES-256 PDF encryption | Double-click → Preview / Acrobat / Chrome ask for the password |
-| Anything else | `name.locked.html`, AES-256-GCM, PBKDF2-SHA256 (600k iterations) | Double-click → type the password in your browser → original file is saved |
+| Anything else | `name.locked.html`, AES-256-GCM, PBKDF2-SHA256 (600k iterations) | Double-click → type the password → the file opens right in your browser. Nothing is saved unless you click **Save an unlocked copy** |
+
+**Opening a locked file. There are only two ways, and SecureDL itself isn't needed for either:**
+1. **A locked PDF:** open it as you'd open any PDF. Preview, Acrobat or Chrome asks for the password every time. The file stays locked on disk.
+2. **Any other locked file (`.locked.html`):** double-click it and type the password. Images, PDFs and text files are shown right in the page. For other types (Word, Excel, zip…), click **Save an unlocked copy**, open that copy in its app, and delete it when you're done. The `.locked.html` file itself stays locked.
 
 The `.locked.html` file is a small, self-contained page with no network access. It works offline on Mac, Windows, Linux and phones. The original filename is encrypted too.
 

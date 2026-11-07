@@ -113,14 +113,14 @@ if (want("locked")) { const s = scene("locked"); const T = "Only the locked copy
   await page.waitForTimeout(400); await askFrame(s, 2.6, T, S, 4); }
 
 // 6. opening a locked file (the self-unlocking page for non-PDF files)
-if (want("opens")) { const s = scene("opens"); const T = "Opens with a double&#8209;click.", S = "PDFs open in Preview with your password. Other files unlock in any browser. Nothing to install.";
+if (want("opens")) { const s = scene("opens"); const T = "Open it with your password.", S = "PDFs open in Preview like any locked PDF. Other files open in your browser. The file stays locked.";
   const vf = fs.readdirSync("samples").find((f) => f.endsWith(".html"));
   const v = await ctx.newPage(); await v.setViewportSize({ width: W, height: H });
   await v.goto("file://" + path.resolve("samples", vf)); await v.evaluate(() => { document.querySelector("main").style.margin = "40px auto 8px"; document.documentElement.style.overflow = "hidden"; });
   await add(s, 1.3, async (f) => frame(f, { step: 5, title: T, sub: S, ui: await shotUI(v), url: "sample-note.txt.locked.html" }));
   await v.fill("#p", "test1234"); await v.evaluate(() => document.activeElement.blur());
   await add(s, 0.7, async (f) => frame(f, { step: 5, title: T, sub: S, ui: await shotUI(v), url: "sample-note.txt.locked.html" }));
-  await v.click("#b"); await v.waitForFunction(() => document.getElementById("m").dataset.state === "ok"); await v.evaluate(() => document.activeElement.blur());
+  await v.click("#b"); await v.waitForFunction(() => document.getElementById("m").dataset.state === "ok"); await v.evaluate(() => { document.activeElement.blur(); document.querySelector("small").style.display = "none"; });
   await add(s, 2.6, async (f) => frame(f, { step: 5, title: T, sub: S, ui: await shotUI(v), url: "sample-note.txt.locked.html" })); }
 
 // 7. end card

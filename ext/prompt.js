@@ -271,7 +271,7 @@ async function saveNormally(always) {
   if (!r?.ok) {
     // Can't start it again: let the next download from this site through once.
     await chrome.runtime.sendMessage({ type: "passOnce", site }).catch(() => {});
-    setStatus("ok", "Click the download button again", `SecureDL couldn't restart this download. Click the download button on ${site} again; it will be let through once.`);
+    setStatus("ok", `Click the download button on ${site} again`, `${site} built this file inside the page and has already discarded it, so SecureDL can't save it for you. Your next download from ${site} in the next 3 minutes goes through without asking.`);
     $("form").hidden = true;
     return;
   }

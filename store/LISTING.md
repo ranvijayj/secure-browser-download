@@ -19,7 +19,7 @@ SecureDL spots sensitive downloads as they start, stops them before anything is 
 
 HOW IT OPENS (no app to install)
 • PDFs are saved as standard AES-256 password-protected PDFs. Double-click and Preview (Mac), Acrobat or Chrome asks for the password.
-• Every other file type is saved as a self-unlocking .html file (AES-256-GCM, PBKDF2 with 600,000 iterations). Double-click, type the password in your browser, and the original file is restored. Works on Mac, Windows, Linux and phones.
+• Every other file type is saved as a self-unlocking .html file (AES-256-GCM, PBKDF2 with 600,000 iterations). Double-click and type the password: the file opens right in your browser and stays locked. You can save an unlocked copy if you need to open it in another app. Works on Mac, Windows, Linux and phones.
 
 FEATURES
 • Automatic detection: asks when documents & images (or every file) start downloading

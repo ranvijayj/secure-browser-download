@@ -40,7 +40,7 @@ async function unlock(password) {
   const sandbox = {
     crypto, TextEncoder, TextDecoder, DataView, Uint8Array, atob, Blob,
     URL: { createObjectURL: (b) => { saved = b; return "blob:x"; } },
-    document: { getElementById: (id) => els[id], createElement: () => ({ style: {}, click() {} }) }
+    document: { getElementById: (id) => els[id], createElement: () => ({ style: {}, click() { this.clicked = true; }, append() {} }) }
   };
   vm.createContext(sandbox);
   vm.runInContext(html.match(/<script>([\s\S]*)<\/script>/)[1], sandbox);
@@ -49,12 +49,14 @@ async function unlock(password) {
   listeners.keydown?.({ key: "a", preventDefault: () => (blocked = true) });
   if (blocked || els.p.onkeydown) throw new Error("vault password box blocks typing");
   await els.b.onclick();
-  return { msg: els.m.textContent, state: els.m.dataset.state, saved, name: els.m.out?.[1]?.download };
+  const link = els.m.out?.find((o) => o && o.download);
+  return { msg: els.m.textContent, state: els.m.dataset.state, saved, name: link?.download, autoSaved: !!link?.clicked };
 }
 const bad = await unlock("wrong-pass");
 ok(bad.state === "error" && bad.msg === "Wrong password. Try again." && !bad.saved, "HTML vault rejects wrong password");
 const good = await unlock("correct-horse");
 const back = new Uint8Array(await good.saved.arrayBuffer());
+ok(!good.autoSaved, "HTML vault does not save an unprotected copy unless asked");
 ok(good.state === "ok" && good.name === "passport.jpg" && back.length === secret.length && back.every((v, i) => v === secret[i]),
   "HTML vault restores exact original bytes and filename");
 

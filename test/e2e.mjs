@@ -174,9 +174,13 @@ if (r4.paths[0]) {
   await v.keyboard.press("Enter");
   await v.waitForFunction(() => document.getElementById("m").dataset.state === "ok");
   const out = path.join(dlDir, "photo.jpg");
+  await new Promise((r) => setTimeout(r, 1500));
+  ok(!fs.existsSync(out) && await v.$eval(".view img", (i) => i.complete && i.src.startsWith("blob:")),
+    "vault opens the photo in the page and saves nothing on its own");
+  await v.click(".save");                                      // explicit "Save an unlocked copy"
   for (let i = 0; i < 40 && !fs.existsSync(out); i++) await new Promise((r) => setTimeout(r, 200));
   ok(fs.existsSync(out) && fs.readFileSync(out).equals(Buffer.from([0xff, 0xd8, 0xff, 1, 2, 3, 4, 5])),
-    "vault unlocks in Chrome (typed password) and restores exact photo.jpg");
+    "Save an unlocked copy restores exact photo.jpg");
 }
 
 // ---------- Automatic detection ("ask" mode) ----------
