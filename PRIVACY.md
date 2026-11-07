@@ -12,4 +12,4 @@ SecureDL does not collect, store or transmit any personal data.
 
 The source code is public, so you can verify all of the above: see this repository.
 
-Contact: open an issue on this repository.
+Contact: SecureDL-chrome@protonmail.com, or open an issue on this repository.

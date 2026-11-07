@@ -44,10 +44,15 @@ PRIVACY
 
 IMPORTANT: there is no password recovery. If you forget the password, the file cannot be opened. Keep the password in your password manager.
 
+## Contact
+- Developer contact email (Account page, shown publicly): `SecureDL-chrome@protonmail.com`
+- Support URL: https://github.com/ranvijayj/secure-browser-download/issues
+
 ## Assets
 - Icon: `ext/icons/128.png`
 - Screenshots (1280×800): `store/screenshot-1.png`, `store/screenshot-2.png`
 - Small promo tile (440×280): `store/promo-small.png`
+- Promo video: upload `store/promo-video.mp4` (27 s, 1920×1080, no audio) to YouTube, then paste the YouTube link in the store's promo video field
 
 ## Privacy tab
 
