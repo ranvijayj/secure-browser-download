@@ -23,11 +23,11 @@ HOW IT OPENS (no app to install)
 
 FEATURES
 • Automatic detection: asks when documents & images (or every file) start downloading
-• "Always save normally" for sites you trust
+• "Always save from this site without asking" for sites you trust
 • Works with downloads that pages build themselves, too
 • "Recent downloads" shows what happened to each download and why
 • Right-click any link, image or video → Download with password
-• Lock a file that's already on your disk
+• Lock a file that's already on your computer
 • Uses the page you're on to fetch the file, so downloads from sites you're signed in to still work
 
 CHECKED BEFORE SAVING
@@ -56,7 +56,7 @@ Save files the user chooses to download in password-protected (encrypted) form, 
 
 **Permission justifications:**
 - `contextMenus`: adds the "Download with password" item to the right-click menu.
-- `downloads`: saves the encrypted file to the user's Downloads folder. If the user turns on automatic detection, it also stops a starting download (so no unprotected copy is written) and asks whether to lock it; "Save normally" restarts that download.
+- `downloads`: saves the encrypted file to the user's Downloads folder. If the user turns on automatic detection, it also stops a starting download (so no unprotected copy is written) and asks whether to lock it; "Save without a password" restarts that download.
 - `activeTab`: when the user right-clicks a link, fetches the file from that tab so the request carries the site's normal sign-in and bot-check state.
 - `scripting`: runs the fetch for that file inside the tab the user right-clicked in (same reason as activeTab). No page content is read or changed.
 - `storage`: remembers the detection setting and the user's "don't ask again" site list. No passwords or files are stored.

@@ -35,7 +35,7 @@ ok(!html.includes("TOP SECRET") && !html.includes("passport.jpg"), "contents and
 // Run the vault page's own inline script with a tiny DOM stub.
 async function unlock(password) {
   const listeners = {};
-  const els = { p: { value: password, addEventListener: (ev, fn) => (listeners[ev] = fn) }, b: {}, m: { textContent: "", innerHTML: "", append(...a) { this.out = a; } } };
+  const els = { p: { value: password, addEventListener: (ev, fn) => (listeners[ev] = fn) }, b: {}, m: { dataset: {}, textContent: "", innerHTML: "", append(...a) { this.out = a; } } };
   let saved = null;
   const sandbox = {
     crypto, TextEncoder, TextDecoder, DataView, Uint8Array, atob, Blob,
@@ -49,13 +49,13 @@ async function unlock(password) {
   listeners.keydown?.({ key: "a", preventDefault: () => (blocked = true) });
   if (blocked || els.p.onkeydown) throw new Error("vault password box blocks typing");
   await els.b.onclick();
-  return { msg: els.m.textContent, saved, name: els.m.out?.[1]?.download };
+  return { msg: els.m.textContent, state: els.m.dataset.state, saved, name: els.m.out?.[1]?.download };
 }
 const bad = await unlock("wrong-pass");
-ok(bad.msg === "❌ Wrong password." && !bad.saved, "HTML vault rejects wrong password");
+ok(bad.state === "error" && bad.msg === "Wrong password. Try again." && !bad.saved, "HTML vault rejects wrong password");
 const good = await unlock("correct-horse");
 const back = new Uint8Array(await good.saved.arrayBuffer());
-ok(good.name === "passport.jpg" && back.length === secret.length && back.every((v, i) => v === secret[i]),
+ok(good.state === "ok" && good.name === "passport.jpg" && back.length === secret.length && back.every((v, i) => v === secret[i]),
   "HTML vault restores exact original bytes and filename");
 
 // ---------- 2b. Wrong-content detection (real Cloudflare page the user hit) ----------

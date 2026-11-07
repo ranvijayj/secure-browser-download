@@ -1,45 +1,83 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>SecureDL – Download with password</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" href="icons/32.png">
 <link rel="stylesheet" href="style.css"></head>
 <body>
-  <h2><img src="icons/48.png" alt="" class="logo"> <span id="title">Download with password</span></h2>
-  <div id="askInfo" class="box" hidden>
-    <div><b id="askName"></b></div>
-    <div class="hint">from <span id="askSite"></span> · <span id="askState">download stopped. Nothing has been saved yet.</span></div>
-    <div id="askDone" class="hint" hidden>⚠ Until you lock it, the unprotected file is in your Downloads folder. Locking deletes it.</div>
-  </div>
-  <p class="src" id="src"></p>
-  <label for="pw">Password <span class="hint">(at least 8 characters, you'll need it to open the file)</span></label>
-  <div class="pwrow"><input type="password" id="pw" autofocus autocomplete="new-password">
-  <button type="button" id="eye" class="secondary" title="Show passwords" aria-label="Show passwords">👁</button></div>
-  <label for="pw2">Confirm password</label>
-  <input type="password" id="pw2" autocomplete="new-password">
-  <p id="pwWarn" class="warn" hidden></p>
-  <div class="actions">
-    <button id="go">Encrypt &amp; save</button>
-    <button id="skip" class="secondary" hidden>Save normally (no password)</button>
-  </div>
-  <p id="neverRow" class="hint" hidden><a href="#" id="never">Always save normally from <span id="neverSite"></span></a> (stop asking for this site)</p>
-  <p id="status" role="status"></p>
-  <div id="access" class="box" hidden>
-    SecureDL needs permission to download from <b id="accessHost"></b>.
-    <button id="allow">Allow for this site</button>
-  </div>
-  <div id="pick" class="box" hidden>
-    <div id="pickIntro"><b>Download it normally, then lock it</b></div>
-    <p class="hint" id="pickHint">SecureDL couldn't fetch this file again (some links work only once). It can let the download through once; when it finishes, you pick it here, it's locked, and the unprotected copy is deleted.</p>
-    <button id="pickStart" class="secondary">Download it normally, then lock it</button>
-    <div id="pickFileWrap" hidden>
-      <p class="hint">Select <b id="pickName"></b> in <span id="pickDir"></span>:</p>
-      <input type="file" id="pickFile">
+<main class="page">
+  <div class="brand"><img src="icons/48.png" alt="">SecureDL</div>
+  <h1 id="title">Download with password</h1>
+  <p class="lede" id="lede">Choose a password. Only the locked copy is saved.</p>
+
+  <!-- the security envelope: the file this page is about -->
+  <div class="envelope" id="card">
+    <div class="label">
+      <svg class="icon"><use href="icons.svg#file"/></svg>
+      <div>
+        <div class="name" id="askName"></div>
+        <div class="site" id="askSite"></div>
+        <div class="badge" id="badge" hidden><svg class="icon" id="badgeIcon"><use href="icons.svg#stop"/></svg><span id="askState">Stopped, nothing saved yet</span></div>
+      </div>
+      <div class="seal" aria-hidden="true"><span><svg class="icon"><use href="icons.svg#lock"/></svg>Locked</span></div>
     </div>
   </div>
-  <div id="fallback" class="box hint" hidden>
-    <b>Workaround:</b> download the file normally, then click the SecureDL icon in the toolbar,
-    choose <i>Lock a file already on disk</i>, and delete the unlocked original afterwards.
+
+  <!-- "Lock a file on this computer" mode -->
+  <div id="localPick" class="picker" hidden>
+    <input type="file" id="localFile">
+    <label for="localFile" class="btn secondary">Choose a file</label>
+    <span class="chosen" id="localChosen">No file chosen</span>
   </div>
-  <p class="foot">Encrypted on this device. Nothing is uploaded. Every file is test-opened with your password before it's saved. If you forget the password, the file can't be recovered.</p>
+
+  <div id="form">
+    <div class="field">
+      <label for="pw">Password</label>
+      <div class="input"><input type="password" id="pw" autofocus autocomplete="new-password" aria-describedby="meterWord">
+        <button type="button" id="eye" class="toggle" aria-pressed="false">Show</button></div>
+      <div class="meter" id="meter" data-level="0"><div class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i></div><span class="word" id="meterWord">At least 8 characters</span></div>
+    </div>
+    <div class="field">
+      <label for="pw2">Confirm password</label>
+      <div class="input"><input type="password" id="pw2" autocomplete="new-password" aria-describedby="match"></div>
+      <div class="match" id="match"></div>
+    </div>
+    <div id="pwWarn" class="callout warn" hidden><svg class="icon"><use href="icons.svg#alert"/></svg><div><b>Easy-to-guess password</b><p id="pwWarnText"></p></div></div>
+
+    <div class="actions">
+      <button id="go" class="btn primary">Lock and save</button>
+      <button id="skip" class="btn secondary" hidden>Save without a password</button>
+    </div>
+    <p id="neverRow" hidden><a href="#" id="never" class="quiet">Always save from <span id="neverSite"></span> without asking</a></p>
+  </div>
+
+  <div id="status" role="status" aria-live="polite" data-state=""></div>
+
+  <div id="access" class="callout info" hidden><svg class="icon"><use href="icons.svg#info"/></svg>
+    <div><b>Allow access to <span id="accessHost"></span></b><p>SecureDL needs permission to download this file for you. Nothing is sent anywhere.</p>
+    <button id="allow" class="btn primary">Allow for this site</button></div></div>
+
+  <div id="pick" class="callout warn" hidden><svg class="icon"><use href="icons.svg#alert"/></svg>
+    <div><b id="pickIntro">Download it normally, then lock it</b>
+      <p id="pickHint">SecureDL couldn't download this file again (some links work only once). It can let the download through once. When it finishes, you pick it here, it's locked, and the unprotected copy is deleted.</p>
+      <button id="pickStart" class="btn secondary">Download it normally, then lock it</button>
+      <div id="pickFileWrap" hidden>
+        <p class="hint">Choose <b id="pickName"></b> in <span id="pickDir"></span>.</p>
+        <div class="picker"><input type="file" id="pickFile"><label for="pickFile" class="btn secondary">Choose the file</label></div>
+      </div>
+    </div></div>
+
+  <div id="fallback" class="callout info" hidden><svg class="icon"><use href="icons.svg#info"/></svg>
+    <div><b>Another way</b><p>Download the file normally, then use <i>Lock a file on this computer</i> from the SecureDL button in the toolbar, and delete the original.</p></div></div>
+
+  <div id="done" hidden>
+    <div class="actions">
+      <button id="showFolder" class="btn secondary"><svg class="icon"><use href="icons.svg#folder"/></svg>Show in folder</button>
+      <button id="doneBtn" class="btn primary">Done</button>
+    </div>
+  </div>
+
+  <p class="foot fine" id="footNote">If you forget this password, the file can't be opened. Everything happens on this computer; nothing is uploaded.</p>
+</main>
 <script src="lib/pdf-lib.min.js"></script>
 <script src="crypto.js"></script>
 <script src="prompt.js"></script>

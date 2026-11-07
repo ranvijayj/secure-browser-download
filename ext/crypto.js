@@ -36,9 +36,9 @@ function checkPassword(pw, confirm) {
   if (/^\s|\s$/.test(pw)) return { error: "Remove spaces at the start or end of the password." };
   const lower = pw.toLowerCase();
   if (COMMON_PASSWORDS.has(lower) || /^(.)\1+$/.test(pw) || /^\d{8,11}$/.test(pw))
-    return { warning: "This password is very easy to guess. Anyone who gets the file could open it." };
+    return { warning: "It's one of the most common passwords. Anyone who gets the file could guess it quickly." };
   if (pw.length < 12 && !(/[a-z]/i.test(pw) && /\d|[^a-z0-9]/i.test(pw)))
-    return { warning: "Fairly weak password. A longer one (or a few random words) is much safer." };
+    return { warning: "It's short and uses only one kind of character. A longer password, or a few random words, is much safer." };
   return {};
 }
 
@@ -159,32 +159,57 @@ async function saveEncrypted({ blob, filename }) {
   // Tell the background the intended name first (see ownNames in background.js).
   await chrome.runtime.sendMessage({ type: "ownName", url, filename }).catch(() => {});
   // uniquify: never overwrite an existing file with the same name.
-  await chrome.downloads.download({ url, filename, saveAs: false, conflictAction: "uniquify" });
+  saveEncrypted.lastId = await chrome.downloads.download({ url, filename, saveAs: false, conflictAction: "uniquify" });
   setTimeout(() => URL.revokeObjectURL(url), 60000);
   return filename;
 }
 
 // The self-unlocking page. No external resources; works offline.
-const VAULT_TEMPLATE = `<!doctype html><html><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>🔒 Locked file</title>
-<style>body{font:15px -apple-system,system-ui,sans-serif;max-width:420px;margin:12vh auto;padding:0 20px;color:#222}
-input{width:100%;padding:10px;font-size:15px;box-sizing:border-box;margin:10px 0}
-button{padding:10px 18px;background:#1a73e8;color:#fff;border:0;border-radius:6px;font-size:15px;cursor:pointer}
-#m{margin-top:14px}</style></head><body>
-<h2>🔒 This file is password-protected</h2>
-<p>Enter the password to unlock it. Nothing is uploaded; it is decrypted on this device.</p>
-<input type="password" id="p" autofocus placeholder="Password"><button id="b">Unlock</button><div id="m"></div>
+const VAULT_TEMPLATE = `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Locked file</title>
+<style>
+:root{color-scheme:light dark;--canvas:#F3F5F8;--surface:#fff;--ink:#142033;--slate:#5A6577;--line:#DCE2EA;--tint:#C3CEDF;--blue:#2242C7;--on-blue:#fff;--green:#16794A;--green-soft:#E5F4EC;--red:#B3261E;--red-soft:#FDECEA}
+@media (prefers-color-scheme:dark){:root{--canvas:#0F1319;--surface:#171C24;--ink:#E8ECF2;--slate:#9AA4B4;--line:#29313D;--tint:#2E3A4D;--blue:#8EA6FF;--on-blue:#0F1319;--green:#5BD08F;--green-soft:#142A1F;--red:#FF8A80;--red-soft:#341A19}}
+*{box-sizing:border-box}body{margin:0;background:var(--canvas);color:var(--ink);font:400 15px/22px -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+main{max-width:440px;margin:12vh auto 48px;padding:0 20px}
+h1{font-size:22px;line-height:28px;font-weight:600;letter-spacing:-.01em;margin:0 0 8px}
+p{margin:0 0 24px;color:var(--slate)}
+.env{border:1px solid var(--line);border-radius:10px;padding:8px;margin-bottom:24px;background:repeating-linear-gradient(-45deg,var(--tint) 0 1.5px,transparent 1.5px 5px),var(--surface)}
+.lab{display:flex;gap:12px;align-items:center;background:var(--surface);border-radius:6px;padding:12px 16px}
+.lab svg{width:28px;height:28px;flex:none;stroke:var(--slate);fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.lab b{display:block;font-size:17px;line-height:24px;font-weight:600}.lab span{color:var(--slate);font-size:13px;line-height:18px}
+label{display:block;font-weight:500;margin-bottom:4px}
+.row{display:flex;gap:8px}
+input{flex:1;min-width:0;height:44px;padding:0 12px;font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px}
+input:focus-visible{outline:2px solid var(--blue);outline-offset:0;border-color:var(--blue)}
+button,.save{height:44px;padding:0 20px;font:500 15px/44px inherit;font-family:inherit;color:var(--on-blue);background:var(--blue);border:0;border-radius:6px;cursor:pointer;text-decoration:none;display:inline-block}
+button:focus-visible,.save:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+#m{margin-top:16px;min-height:22px;color:var(--slate)}
+#m[data-state=error]{color:var(--red)}
+#m[data-state=ok]{background:var(--green-soft);color:var(--ink);border-radius:10px;padding:12px 16px}
+#m[data-state=ok] .save{display:table;margin-top:12px;height:40px;line-height:40px;font-size:14px}
+small{display:block;margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:var(--slate);font-size:12px;line-height:16px}
+</style></head><body><main>
+<h1>This file is locked</h1>
+<p>Enter the password to open it. It's unlocked on this device; nothing is uploaded.</p>
+<div class="env"><div class="lab"><svg viewBox="0 0 24 24"><rect x="4.5" y="10.5" width="15" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/><path d="M12 14.5v2"/></svg>
+<div><b>Locked file</b><span>The file name is hidden until it's unlocked.</span></div></div></div>
+<label for="p">Password</label>
+<div class="row"><input type="password" id="p" autofocus autocomplete="current-password"><button id="b">Unlock</button></div>
+<div id="m" role="status" aria-live="polite"></div>
+<small>Locked with SecureDL (AES-256). Without the password, this file can't be opened.</small>
+</main>
 <script>
 const S="__SALT__",I="__IV__",N=__ITER__,D="__DATA__";
 const u=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
-async function go(){const m=document.getElementById("m");m.textContent="Unlocking…";
+async function go(){const m=document.getElementById("m");m.dataset.state="busy";m.textContent="Unlocking…";
 try{const k0=await crypto.subtle.importKey("raw",new TextEncoder().encode(document.getElementById("p").value),"PBKDF2",false,["deriveKey"]);
 const k=await crypto.subtle.deriveKey({name:"PBKDF2",salt:u(S),iterations:N,hash:"SHA-256"},k0,{name:"AES-GCM",length:256},false,["decrypt"]);
 const p=new Uint8Array(await crypto.subtle.decrypt({name:"AES-GCM",iv:u(I)},k,u(D)));
 const n=new DataView(p.buffer).getUint32(0),name=new TextDecoder().decode(p.subarray(4,4+n));
 const url=URL.createObjectURL(new Blob([p.subarray(4+n)]));
-m.innerHTML="";const a=document.createElement("a");a.href=url;a.download=name;a.textContent="⬇ Save "+name;
-a.style.fontSize="17px";m.append("✅ Unlocked. ",a);a.click();}
-catch(e){m.textContent=e.name==="OperationError"?"❌ Wrong password.":"❌ "+e.message;}}
+m.innerHTML="";m.dataset.state="ok";const a=document.createElement("a");a.href=url;a.download=name;a.className="save";a.textContent="Save "+name+" again";
+m.append("Unlocked. "+name+" was saved to your downloads.",a);a.click();}
+catch(e){m.dataset.state="error";m.textContent=e.name==="OperationError"?"Wrong password. Try again.":"Couldn't unlock: "+e.message;}}
 document.getElementById("b").onclick=go;document.getElementById("p").addEventListener("keydown",e=>{if(e.key==="Enter")go();});
 </script></body></html>`;

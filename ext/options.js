@@ -1,31 +1,36 @@
 const $ = (id) => document.getElementById(id);
+const radios = () => [...document.querySelectorAll('input[name="mode"]')];
 
 async function load() {
   const s = await readSettings();
-  $("mode").value = s.mode;
-  $("state").textContent = MODE_TEXT[s.mode];
+  for (const r of radios()) r.checked = r.value === s.mode;
   const need = s.mode !== "off";
   $("access").hidden = !need;
-  $("grant").hidden = !need || s.granted;
-  $("accessText").innerHTML = s.granted
-    ? "✅ Access granted. Automatic detection is working."
-    : "⚠ <b>Not working yet:</b> Chrome hasn't given SecureDL access, so downloads aren't intercepted.";
+  $("access").className = "callout " + (s.granted ? "ok" : "warn");
+  $("accessIcon").innerHTML = `<use href="icons.svg#${s.granted ? "check" : "alert"}"/>`;
+  $("accessTitle").textContent = s.granted ? "Working" : "Not working yet";
+  $("accessText").textContent = s.granted
+    ? "SecureDL can stop downloads and fetch them to lock them."
+    : "SecureDL needs access to all sites so it can stop a download and fetch the file to lock it. Files are never sent anywhere.";
+  $("grant").hidden = s.granted;
+
   const ul = $("never"); ul.textContent = "";
-  if (!s.neverAsk.length) { const li = document.createElement("li"); li.className = "hint"; li.textContent = "None."; ul.append(li); }
+  if (!s.neverAsk.length) { const li = document.createElement("li"); li.className = "empty"; li.textContent = "None. Add one with “Always save from … without asking” when SecureDL asks."; ul.append(li); }
   for (const site of s.neverAsk) {
-    const li = document.createElement("li"); li.textContent = site + " ";
-    const a = document.createElement("a"); a.href = "#"; a.textContent = "remove";
+    const li = document.createElement("li"); li.style.gridTemplateColumns = "1fr auto";
+    const f = document.createElement("span"); f.className = "file"; f.textContent = site;
+    const a = document.createElement("a"); a.href = "#"; a.textContent = "Remove";
     a.onclick = async (e) => { e.preventDefault(); await chrome.storage.local.set({ neverAsk: s.neverAsk.filter((x) => x !== site) }); };
-    li.append(a); ul.append(li);
+    li.append(f, a); ul.append(li);
   }
-  renderLog($("recent"), s.log);
+  renderLog($("recent"), s.log, 15);
 }
 load();
 chrome.storage.onChanged.addListener(load);
 chrome.permissions.onAdded.addListener(load);
 chrome.permissions.onRemoved.addListener(load);
 
-$("mode").onchange = async () => { await saveMode($("mode").value); load(); };
+for (const r of radios()) r.addEventListener("change", async () => { await saveMode(r.value); load(); });
 $("grant").onclick = async () => {
   try { await chrome.permissions.request(ALL_SITES); } catch (e) { console.warn(e); }
   load();

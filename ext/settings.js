@@ -1,12 +1,6 @@
 // Shared by popup.html and options.html: detection setting, access status, activity log.
 const ALL_SITES = { origins: ["<all_urls>"] };
 
-const MODE_TEXT = {
-  "off": "Only right-click downloads are locked.",
-  "ask-docs": "Downloads of documents & images are stopped before anything is saved, and you are asked whether to lock them.",
-  "ask-all": "Every download is stopped before anything is saved, and you are asked whether to lock it."
-};
-
 async function readSettings() {
   const s = await chrome.storage.local.get(["mode", "neverAsk", "log", "protectAll"]);
   return { mode: s.mode || (s.protectAll ? "ask-all" : "off"), neverAsk: s.neverAsk || [], log: s.log || [],
@@ -21,16 +15,35 @@ async function saveMode(mode) {
 
 function ago(t) {
   const s = Math.round((Date.now() - t) / 1000);
-  return s < 60 ? s + "s ago" : s < 3600 ? Math.round(s / 60) + "m ago" : new Date(t).toLocaleString();
+  if (s < 60) return "now";
+  if (s < 3600) return Math.round(s / 60) + " min";
+  if (s < 86400) return Math.round(s / 3600) + " h";
+  return new Date(t).toLocaleDateString();
 }
 
-function renderLog(ul, log) {
+// Short, plain outcome for a logged decision; the full reason stays in the tooltip.
+function outcome(decision) {
+  const d = decision.toLowerCase();
+  if (d.startsWith("stopped and asked")) return ["asked", "Stopped and asked"];
+  if (d.startsWith("asked")) return ["asked", "Asked"];
+  if (d.includes("not intercepted")) return ["missed", "Not stopped: access missing"];
+  if (d.includes("not a document")) return ["", "Not a document, saved normally"];
+  if (d.includes("always save normally")) return ["", "Saved normally (site on your list)"];
+  if (d.includes("closed without choosing")) return ["", "Closed, nothing saved"];
+  if (d.includes("let through once")) return ["", "Let through once"];
+  return ["", decision];
+}
+
+function renderLog(ul, log, max = 8) {
   ul.textContent = "";
-  if (!log.length) { const li = document.createElement("li"); li.className = "hint"; li.textContent = "No downloads seen yet."; ul.append(li); return; }
-  for (const e of log.slice(0, 8)) {
-    const li = document.createElement("li");
-    const b = document.createElement("b"); b.textContent = e.name;
-    const d = document.createElement("div"); d.className = "hint"; d.textContent = `${e.site} · ${ago(e.t)} · ${e.decision}`;
-    li.append(b, d); ul.append(li);
+  if (!log.length) { const li = document.createElement("li"); li.className = "empty"; li.textContent = "No downloads yet."; ul.append(li); return; }
+  for (const e of log.slice(0, max)) {
+    const [tone, text] = outcome(e.decision);
+    const li = document.createElement("li"); li.title = `${e.site}: ${e.decision}`;
+    const dot = document.createElement("span"); dot.className = "dot " + tone;
+    const f = document.createElement("span"); f.className = "file"; f.textContent = e.name;
+    const t = document.createElement("time"); t.textContent = ago(e.t);
+    const w = document.createElement("span"); w.className = "what"; w.textContent = `${text}, ${e.site}`;
+    li.append(dot, f, t, w); ul.append(li);
   }
 }

@@ -36,16 +36,16 @@ Try it: `samples/` has one of each. The password is `test1234`.
 
   Chrome asks once to give SecureDL access to all sites, which it needs to fetch the file. If access is missing, the toolbar icon shows a red **!**.
   The download is **stopped immediately**, so nothing is saved, not even a partial file. Then a "Lock this download?" tab opens:
-  - **Encrypt & save:** SecureDL downloads the file again and saves only the locked copy.
-  - **Save normally:** the download is restarted without a password.
-  - **Always save normally from <site>:** the same, and SecureDL stops asking for that site.
+  - **Lock and save:** SecureDL downloads the file again and saves only the locked copy.
+  - **Save without a password:** the download is restarted as normal.
+  - **Always save from <site> without asking:** the same, and SecureDL stops asking for that site.
   - **Close the tab:** nothing is saved.
 
   Why stop instead of pause? Chrome holds a download for an extension for only about 10 seconds, then saves it anyway. That's too short to type a password.
   Downloads a page builds itself (`blob:` downloads) are handled too. If the file can't be fetched again (single-use links, files the page already discarded), choose **Download it normally, then lock it**. It's let through once; when it finishes you pick it, it's locked, and the unprotected copy is deleted.
   **Recent downloads** in the popup and Settings shows what SecureDL did with each download and why. Check it first if something wasn't intercepted.
 - **Right-click** any link, image or video → **Download with password**.
-- **Toolbar icon → Lock a file already on disk.**
+- **Toolbar icon → Lock a file on this computer.** This opens in a tab, because on macOS a file dialog would close the toolbar popup.
 
 ## Checks before anything is saved
 
@@ -58,7 +58,7 @@ Try it: `samples/` has one of each. The password is `test1234`.
 | File larger than 1 GB (everything is processed in memory) | Refused with a clear message |
 | **Self-check:** the encrypted output is opened again with your password. A PDF must not open without the password and must keep its page count. A `.locked.html` file must decrypt to exactly the original bytes (SHA-256) and filename. | If any of this fails, nothing is saved |
 | A file with the same name already exists | Saved as `name (1)…`, never overwritten |
-| Automatic mode: a detected download | Stopped at once (Chrome deletes the partial file); nothing reaches the disk unless you choose Save normally |
+| Automatic mode: a detected download | Stopped at once (Chrome deletes the partial file); nothing reaches the disk unless you choose Save without a password |
 
 ## Security model
 
@@ -68,11 +68,11 @@ Try it: `samples/` has one of each. The password is `test1234`.
 - **Refuses junk.** If a site returns a bot-check, login, error or empty page instead of the file, nothing is saved.
 - **No recovery.** There is no backdoor and no password reset. Lose the password and the file is gone. Use a password manager.
 
-What it does **not** protect against: malware on your computer, or someone watching you type the password. The file is held in memory unencrypted while it's being encrypted. Encryption also adds no protection once you unlock and save the original somewhere. In automatic mode, Chrome may briefly write part of the file to a temporary `.crdownload` file before SecureDL stops the download. Stopping it deletes that file. **Save normally** downloads the file a second time.
+What it does **not** protect against: malware on your computer, or someone watching you type the password. The file is held in memory unencrypted while it's being encrypted. Encryption also adds no protection once you unlock and save the original somewhere. In automatic mode, Chrome may briefly write part of the file to a temporary `.crdownload` file before SecureDL stops the download. Stopping it deletes that file. **Save without a password** downloads the file a second time.
 
 ## Limitations
 
-- Files a site generates in the page itself (`blob:` downloads) can't be re-fetched. Download normally, then use **Lock a file already on disk**.
+- Files a site generates in the page itself (`blob:` downloads) can't be re-fetched. Download normally, then use **Lock a file on this computer**.
 - Very large files (hundreds of MB) are processed in memory.
 - PDFs that are already encrypted are saved as `.locked.html` instead.
 
@@ -87,13 +87,17 @@ npm run screenshots
 
 The end-to-end suite loads the extension into Chrome and types passwords with real keystrokes. It runs against a local server that imitates a Cloudflare-protected PDF, a login page, an image, and slow, instant and fake (`MZ`) downloads. It uses Chrome's real download handling, not Playwright's override, which skips the step extensions hook into. For automatic detection it checks:
 - a fast 2 MB PDF leaves nothing on disk even after 45 seconds with the form unfilled.
-- Encrypt & save, Save normally and Always save normally each do what they say.
+- Lock and save, Save without a password, and Always save from <site> without asking each do what they say.
 - installers are ignored in documents-only mode.
 - page-made and single-use downloads work through the "download then lock" fallback.
 - closing the tab saves nothing.
 
 It also checks that the shipped manifest requests no site access up front.
 
+## Design
+
+The UI follows [DESIGN.md](DESIGN.md). It's a "security envelope" design: the tint pattern printed inside confidential envelopes marks the file card, and the card seals when the file is locked. It uses IBM Plex Sans, one ink-blue accent, and full light and dark themes. `node tools/shots.mjs <dir>` screenshots every screen in both themes.
+
 ## License
 
-MIT. Bundles [pdf-lib](https://github.com/cantoo-scribe/pdf-lib) (MIT).
+MIT. Bundles [pdf-lib](https://github.com/cantoo-scribe/pdf-lib) (MIT) and [IBM Plex Sans](https://github.com/IBM/plex) (SIL Open Font License 1.1).

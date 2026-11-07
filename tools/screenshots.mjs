@@ -1,4 +1,4 @@
-// Generates Chrome Web Store images from the real extension UI.
+// Generates Chrome Web Store images from the real extension UI (see DESIGN.md).
 // Output: store/screenshot-1.png, screenshot-2.png (1280x800), promo-small.png (440x280)
 import fs from "fs"; import os from "os"; import path from "path";
 import { chromium } from "playwright-core";
@@ -6,61 +6,71 @@ import { chromium } from "playwright-core";
 const out = path.resolve("store"); fs.mkdirSync(out, { recursive: true });
 const ext = path.resolve("ext");
 const ctx = await chromium.launchPersistentContext(fs.mkdtempSync(path.join(os.tmpdir(), "sdl-shot-")), {
-  executablePath: "/usr/bin/google-chrome", headless: false, deviceScaleFactor: 2,
+  executablePath: "/usr/bin/google-chrome", headless: false, deviceScaleFactor: 2, colorScheme: "light",
   args: ["--headless=new", `--disable-extensions-except=${ext}`, `--load-extension=${ext}`, "--no-sandbox"] });
 let [sw] = ctx.serviceWorkers(); if (!sw) sw = await ctx.waitForEvent("serviceworker");
 const id = sw.url().split("/")[2];
+const b64 = (buf) => buf.toString("base64");
 
-// Real UI captures
-const p = await ctx.newPage(); await p.setViewportSize({ width: 560, height: 380 });
-await p.goto(`chrome-extension://${id}/prompt.html?` + new URLSearchParams({ url: "https://mybank.example/statements/2026-10.pdf",
-  ask: "1", dlId: "999999", name: "Statement-2026-10.pdf", site: "mybank.example" }));
-await p.fill("#pw", "correct horse battery"); await p.fill("#pw2", "correct horse battery");
-await p.evaluate(() => { document.getElementById("src").hidden = true; document.querySelector(".foot").hidden = true; });
-await p.evaluate(() => (document.body.style.margin = "10px auto"));
-const prompt = (await p.screenshot()).toString("base64");
-const q = await ctx.newPage(); await q.setViewportSize({ width: 340, height: 420 });
-await q.goto(`chrome-extension://${id}/popup.html`);
-const popup = (await q.screenshot()).toString("base64");
-const icon = fs.readFileSync("assets/icon-512.png").toString("base64");
+// ---- real UI captures ----
+async function capture(url, w, h, prep) {
+  const p = await ctx.newPage(); await p.setViewportSize({ width: w, height: h });
+  await p.goto(url); await p.waitForTimeout(300); if (prep) await prep(p); await p.waitForTimeout(500);
+  const img = await p.screenshot(); await p.close(); return b64(img);
+}
+const askUrl = `chrome-extension://${id}/prompt.html?` + new URLSearchParams({ url: "https://mybank.example/statements/2026-10.pdf",
+  ask: "1", name: "Statement-2026-10.pdf", site: "mybank.example" });
+const hideChrome = (p) => p.evaluate(() => { document.querySelector(".brand").hidden = true; document.querySelector(".foot").hidden = true;
+  document.querySelector(".page").style.margin = "28px auto 8px"; });
+const ask = await capture(askUrl, 520, 600, async (p) => {
+  await hideChrome(p);
+  for (const s of ["#pw", "#pw2"]) { await p.fill(s, "correct horse battery"); await p.dispatchEvent(s, "input"); }
+});
+const sealed = await capture(askUrl, 520, 420, async (p) => { await hideChrome(p); await p.evaluate(() => { savedId = 1; succeed("Statement-2026-10 (locked).pdf"); document.activeElement.blur(); }); });
+const vaultFile = fs.readdirSync("samples").find((f) => f.endsWith(".html"));
+const vault = await capture("file://" + path.resolve("samples", vaultFile), 520, 420, async (p) => {
+  await p.evaluate(() => { document.documentElement.style.overflow = "hidden"; document.querySelector("main").style.margin = "28px auto 8px";
+    document.querySelector("small").style.display = "none"; });
+  await p.fill("#p", "correct horse"); await p.evaluate(() => document.activeElement.blur()); });
+const icon = b64(fs.readFileSync("assets/icon-512.png"));
+const font = (w) => `@font-face{font-family:Plex;font-weight:${w};src:url(data:font/woff2;base64,${b64(fs.readFileSync(`ext/fonts/ibm-plex-sans-latin-${w}-normal.woff2`))})}`;
 
-const frame = (inner) => `<!doctype html><html><body style="margin:0;width:1280px;height:800px;overflow:hidden;
-  font-family:-apple-system,system-ui,'Segoe UI',sans-serif;background:linear-gradient(135deg,#0b3d91,#1a73e8);color:#fff">${inner}</body></html>`;
-// Frames render at exactly the store sizes (1x); the embedded UI captures above are 2x for sharpness.
+// ---- frames: canvas + security-envelope band, ink type (no gradients) ----
+const frame = (inner) => `<!doctype html><html><head><style>${font(400)}${font(600)}
+  body{margin:0;width:1280px;height:800px;overflow:hidden;font-family:Plex,sans-serif;background:#F3F5F8;color:#142033;position:relative}
+  .band{position:absolute;inset:0 auto 0 0;width:28px;background:repeating-linear-gradient(-45deg,#C3CEDF 0 2px,transparent 2px 7px)}
+  h1{font-weight:600;letter-spacing:-.02em;margin:0} p{color:#5A6577;margin:0}
+  .shot{border-radius:14px;border:1px solid #DCE2EA;background:#fff;display:block}
+</style></head><body><div class="band"></div>${inner}</body></html>`;
 const plain = await chromium.launch({ executablePath: "/usr/bin/google-chrome", args: ["--headless=new", "--no-sandbox"] });
 const shot = async (html, file, w = 1280, h = 800) => {
   const s = await plain.newPage({ deviceScaleFactor: 1 }); await s.setViewportSize({ width: w, height: h });
-  await s.setContent(html); await s.screenshot({ path: path.join(out, file) }); await s.close();
+  await s.setContent(html); await s.waitForTimeout(300); await s.screenshot({ path: path.join(out, file) }); await s.close();
 };
-const card = (b64, w) => `<img src="data:image/png;base64,${b64}" style="width:${w}px;border-radius:14px;box-shadow:0 30px 80px rgba(0,0,0,.35)">`;
 
 await shot(frame(`
-  <div style="display:flex;align-items:center;gap:60px;padding:0 80px;height:100%">
-    <div style="flex:0 0 520px">
-      <img src="data:image/png;base64,${icon}" style="width:84px">
-      <h1 style="font-size:48px;line-height:1.12;margin:24px 0 18px;white-space:nowrap">Downloads that arrive<br>already locked.</h1>
-      <p style="font-size:21px;opacity:.92;line-height:1.55;white-space:nowrap">Stops sensitive downloads before they’re saved<br>and asks to <b>lock them with a password</b>.<br>
-      Or right-click any link → <b>Download with password</b>.</p>
-    </div>${card(prompt, 600)}</div>`), "screenshot-1.png");
-
-await shot(frame(`
-  <div style="padding:0 80px;height:100%;display:flex;flex-direction:column;justify-content:center">
-    <h1 style="font-size:48px;margin:0 0 40px">Opens with a double-click. Nothing to install.</h1>
-    <div style="display:flex;gap:36px">
-      ${[["📄", "PDFs", "Saved as an AES-256 password-protected PDF. Preview, Acrobat and Chrome ask for the password."],
-         ["🗂️", "Everything else", "Saved as a self-unlocking .html file (AES-256-GCM). Opens in any browser on Mac, Windows or phone."],
-         ["🛡️", "Checked before saving", "Every file is test-opened with your password first. Fake documents and login pages are refused. 100% local, open source."]]
-        .map(([e, t, d]) => `<div style="flex:1;background:rgba(255,255,255,.12);border-radius:20px;padding:36px">
-          <div style="font-size:56px">${e}</div><h2 style="font-size:30px;margin:18px 0 12px">${t}</h2>
-          <p style="font-size:21px;line-height:1.45;opacity:.92;margin:0">${d}</p></div>`).join("")}
+  <div style="display:flex;align-items:center;gap:64px;padding:0 72px 0 104px;height:100%">
+    <div style="flex:0 0 470px">
+      <img src="data:image/png;base64,${icon}" style="width:64px">
+      <h1 style="font-size:46px;line-height:54px;margin:28px 0 20px;white-space:nowrap">Sensitive downloads,<br>saved locked.</h1>
+      <p style="font-size:21px;line-height:32px">SecureDL stops a bank statement or tax form before it's saved and asks for a password. Only the locked copy reaches your disk.</p>
     </div>
-    <p style="font-size:20px;opacity:.85;margin-top:44px">Also: lock files already on disk, from the toolbar button.</p>
+    <img class="shot" src="data:image/png;base64,${ask}" style="width:520px">
+  </div>`), "screenshot-1.png");
+
+await shot(frame(`
+  <div style="padding:88px 72px 0 104px">
+    <h1 style="font-size:40px;line-height:48px">Opens with a double-click. Nothing to install.</h1>
+    <p style="font-size:20px;line-height:30px;margin-top:12px;max-width:820px">PDFs become standard password-protected PDFs that Preview and Acrobat open. Other files unlock in any browser. Everything stays on your computer.</p>
+    <div style="display:flex;gap:40px;margin-top:48px;align-items:flex-start">
+      <div><img class="shot" src="data:image/png;base64,${sealed}" style="width:520px"><p style="font-size:17px;margin-top:14px">Every file is test-opened with your password before it's saved.</p></div>
+      <div><img class="shot" src="data:image/png;base64,${vault}" style="width:520px"><p style="font-size:17px;margin-top:14px">What a locked non-PDF file looks like when opened.</p></div>
+    </div>
   </div>`), "screenshot-2.png");
 
-await shot(frame(`<div style="display:flex;align-items:center;gap:22px;padding:0 34px;height:280px">
-  <img src="data:image/png;base64,${icon}" style="width:110px">
-  <div><div style="font-size:38px;font-weight:700">SecureDL</div>
-  <div style="font-size:19px;opacity:.92;line-height:1.35;margin-top:6px">Password-protected<br>downloads. 100% local.</div></div></div>`),
+await shot(frame(`<div style="display:flex;align-items:center;gap:20px;padding:0 24px 0 56px;height:280px">
+  <img src="data:image/png;base64,${icon}" style="width:84px">
+  <div><h1 style="font-size:32px;line-height:38px">SecureDL</h1>
+  <p style="font-size:16px;line-height:23px;margin-top:6px">Password-protected downloads.<br>Nothing leaves your computer.</p></div></div>`),
   "promo-small.png", 440, 280);
-fs.writeFileSync(path.join(out, "popup.png"), Buffer.from(popup, "base64"));
-await ctx.close(); await plain.close(); console.log(fs.readdirSync(out));
+await ctx.close(); await plain.close(); console.log(fs.readdirSync(out).filter((f) => f.endsWith(".png")));

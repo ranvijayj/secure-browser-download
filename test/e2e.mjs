@@ -112,6 +112,8 @@ async function savedSince(id, wantCount = 1, timeout = 8000) {
 const site = await ctx.newPage(); await site.goto(base + "/page");
 const tabId = await sw.evaluate(async (u) => (await chrome.tabs.query({ url: u }))[0].id, base + "/page");
 
+// Status is now a callout with data-state ok|error; tests compare against "✅ …" / "❌ …".
+const statusOf = (p) => p.$eval("#status", (e) => (e.dataset.state === "ok" ? "✅ " : e.dataset.state === "error" ? "❌ " : "") + e.textContent);
 async function attempt(file, password, { withTab = true } = {}) {
   const p = await ctx.newPage();
   const since = await lastId();
@@ -124,8 +126,8 @@ async function attempt(file, password, { withTab = true } = {}) {
   const typed = await p.$eval("#pw", (e) => e.value);
   await p.click("#pw2"); await p.keyboard.type(password, { delay: 10 });
   await p.keyboard.press("Enter");
-  await p.waitForFunction(() => /✅|❌/.test(document.getElementById("status").textContent), null, { timeout: 30000 });
-  const status = await p.$eval("#status", (e) => e.textContent);
+  await p.waitForFunction(() => ["ok","error"].includes(document.getElementById("status").dataset.state) || !document.getElementById("access").hidden, null, { timeout: 30000 });
+  const status = await statusOf(p);
   const asked = await p.evaluate(() => window.__asked);
   const fallbackShown = await p.$eval("#fallback", (e) => !e.hidden).catch(() => false);
   const paths = status.includes("✅") ? await savedSince(since) : (await new Promise((r) => setTimeout(r, 800)), await savedSince(since, 1, 0));
@@ -166,11 +168,11 @@ if (r4.paths[0]) {
   const v = await ctx.newPage();
   await v.goto("file://" + r4.paths[0]);
   await v.click("#p"); await v.keyboard.type("wrong-pw"); await v.keyboard.press("Enter");
-  await v.waitForFunction(() => document.getElementById("m").textContent.includes("❌"));
+  await v.waitForFunction(() => document.getElementById("m").dataset.state === "error");
   ok(true, "vault rejects wrong password in Chrome");
   await v.fill("#p", ""); await v.click("#p"); await v.keyboard.type("hunter22", { delay: 20 });
   await v.keyboard.press("Enter");
-  await v.waitForFunction(() => document.getElementById("m").textContent.includes("✅"));
+  await v.waitForFunction(() => document.getElementById("m").dataset.state === "ok");
   const out = path.join(dlDir, "photo.jpg");
   for (let i = 0; i < 40 && !fs.existsSync(out); i++) await new Promise((r) => setTimeout(r, 200));
   ok(fs.existsSync(out) && fs.readFileSync(out).equals(Buffer.from([0xff, 0xd8, 0xff, 1, 2, 3, 4, 5])),
@@ -188,8 +190,8 @@ async function lockIn(p, pw = "tangerine-kayak-41") {
   await p.evaluate(() => { const o = chrome.downloads.download.bind(chrome.downloads);
     window.__asked = []; chrome.downloads.download = (x) => { window.__asked.push(x.filename); return o(x); }; });
   await p.fill("#pw", pw); await p.fill("#pw2", pw); await p.click("#go");
-  await p.waitForFunction(() => /✅|❌/.test(document.getElementById("status").textContent), null, { timeout: 30000 });
-  const out = { status: await p.$eval("#status", (e) => e.textContent), asked: await p.evaluate(() => window.__asked) };
+  await p.waitForFunction(() => ["ok","error"].includes(document.getElementById("status").dataset.state), null, { timeout: 30000 });
+  const out = { status: await statusOf(p), asked: await p.evaluate(() => window.__asked) };
   out.saved = out.status.includes("✅") ? await savedSince(since) : [];
   await new Promise((r) => setTimeout(r, 1500));
   return out;
@@ -316,7 +318,7 @@ ask = await tabP;
 if (ask) {
   await ask.waitForLoadState(); await new Promise((r) => setTimeout(r, 600));
   await ask.fill("#pw", "tangerine-kayak-41"); await ask.fill("#pw2", "tangerine-kayak-41"); await ask.click("#go");
-  await ask.waitForFunction(() => /❌|✅/.test(document.getElementById("status").textContent), null, { timeout: 20000 });
+  await ask.waitForFunction(() => ["ok","error"].includes(document.getElementById("status").dataset.state), null, { timeout: 20000 });
   ok(await ask.$eval("#pick", (e) => !e.hidden), "revoked page-made file can't be fetched: offers 'download it normally, then lock it'");
   await ask.click("#pickStart");
   await ask.waitForFunction(() => /click the download button/i.test(document.getElementById("pickHint").textContent), null, { timeout: 5000 });
@@ -331,8 +333,8 @@ if (ask) {
     const since = await lastId();
     await lockPage.fill("#pw", "tangerine-kayak-41"); await lockPage.fill("#pw2", "tangerine-kayak-41");
     await lockPage.setInputFiles("#pickFile", path.join(dlDir, "page-made-revoked.txt"));
-    await lockPage.waitForFunction(() => /Saved|not the|❌/.test(document.getElementById("status").textContent), null, { timeout: 20000 });
-    const st = await lockPage.$eval("#status", (e) => e.textContent);
+    await lockPage.waitForFunction(() => ["ok","error"].includes(document.getElementById("status").dataset.state), null, { timeout: 20000 });
+    const st = await statusOf(lockPage);
     const saved = await savedSince(since);
     await new Promise((r) => setTimeout(r, 800));
     ok(st.includes("✅") && path.basename(saved[0] || "") === "page-made-revoked.txt.locked.html" && !inDir("page-made-revoked.txt"),
@@ -385,7 +387,7 @@ await ctx.close();
   const dls = [];
   await p.goto(`chrome-extension://${id2}/prompt.html?` + new URLSearchParams({ url: base + "/protected.pdf", tabId: "" }));
   await p.click("#pw"); await p.keyboard.type("hunter22"); await p.fill("#pw2", "hunter22"); await p.keyboard.press("Enter");
-  await p.waitForFunction(() => !document.getElementById("access").hidden || /❌|✅/.test(document.getElementById("status").textContent), null, { timeout: 15000 });
+  await p.waitForFunction(() => !document.getElementById("access").hidden || ["ok","error"].includes(document.getElementById("status").dataset.state), null, { timeout: 15000 });
   const shown = await p.$eval("#access", (e) => !e.hidden);
   const host = await p.$eval("#accessHost", (e) => e.textContent);
   ok(shown && host === new URL(base).host && dls.length === 0, `without access: asks to allow "${host}", nothing saved`);
@@ -394,7 +396,7 @@ await ctx.close();
   // dialog is still open (on macOS that dialog closes the popup).
   const pop = await c2.newPage(); await pop.goto(`chrome-extension://${id2}/popup.html`);
   const optP = c2.waitForEvent("page", { predicate: (pg) => pg.url().includes("options.html"), timeout: 8000 }).catch(() => null);
-  await pop.focus("#mode"); await pop.keyboard.press("ArrowDown"); await pop.keyboard.press("ArrowDown");
+  await pop.click('input[name="mode"][value="ask-all"]');
   await new Promise((r) => setTimeout(r, 1500));
   const stored = await w2.evaluate(() => chrome.storage.local.get("mode"));
   ok(stored.mode === "ask-all", "popup: detection setting is saved immediately (before any access dialog)");

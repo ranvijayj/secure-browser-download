@@ -1,36 +1,31 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="style.css"></head>
 <body class="popup">
-  <h2><img src="icons/32.png" alt="" class="logo"> SecureDL</h2>
-  <p class="hint">Right-click any link → <b>Download with password</b>.</p>
-  <label for="mode"><b>When a download starts</b></label>
-  <select id="mode">
-    <option value="off">Do nothing (right-click only)</option>
-    <option value="ask-docs">Ask me for documents &amp; images</option>
-    <option value="ask-all">Ask me for every download</option>
-  </select>
-  <p id="state" class="hint"></p>
-  <div id="needAccess" class="warn" hidden>
-    ⚠ Automatic detection is on, but Chrome hasn't given SecureDL access to fetch downloads yet, so nothing is intercepted.
-    <button id="grant">Give access…</button>
-  </div>
-  <details id="recentWrap">
-    <summary class="hint">Recent downloads</summary>
-    <ul id="recent" class="log"></ul>
-  </details>
-  <hr>
-  <p><b>Lock a file already on disk</b></p>
-  <input type="file" id="file">
-  <label for="pw">Password</label>
-  <input type="password" id="pw" autocomplete="new-password">
-  <label for="pw2">Confirm password</label>
-  <input type="password" id="pw2" autocomplete="new-password">
-  <p id="pwWarn" class="warn" hidden></p>
-  <button id="go">Encrypt &amp; save</button>
-  <p id="status" role="status"></p>
-  <p class="hint"><a href="options.html" target="_blank">Settings</a></p>
-<script src="lib/pdf-lib.min.js"></script>
-<script src="crypto.js"></script>
+  <header>
+    <div class="brand"><img src="icons/32.png" alt="">SecureDL</div>
+    <a href="options.html" target="_blank" title="Settings" aria-label="Settings"><svg class="icon"><use href="icons.svg#settings"/></svg></a>
+  </header>
+
+  <section>
+    <h3 id="modeLabel">When a download starts</h3>
+    <div class="choices" role="radiogroup" aria-labelledby="modeLabel">
+      <label class="choice"><input type="radio" name="mode" value="off"><b>Do nothing</b><span>Lock files only when you right-click a link.</span></label>
+      <label class="choice"><input type="radio" name="mode" value="ask-docs"><b>Ask for documents</b><span>PDFs, Office files, spreadsheets, images.</span></label>
+      <label class="choice"><input type="radio" name="mode" value="ask-all"><b>Ask for every download</b><span>Including installers and archives.</span></label>
+    </div>
+    <div id="needAccess" class="callout warn" hidden><svg class="icon"><use href="icons.svg#alert"/></svg>
+      <div><b>Not working yet</b><p>Chrome needs to give SecureDL access before downloads can be stopped.</p>
+      <button id="grant" class="btn secondary">Give access</button></div></div>
+  </section>
+
+  <section id="recentWrap">
+    <h3>Recent downloads</h3>
+    <ul id="recent" class="activity"></ul>
+  </section>
+
+  <section>
+    <button id="lockLocal" class="btn secondary"><svg class="icon"><use href="icons.svg#lock"/></svg>Lock a file on this computer</button>
+  </section>
 <script src="settings.js"></script>
 <script src="popup.js"></script>
 </body></html>

@@ -1,31 +1,32 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>SecureDL settings</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" href="icons/32.png"><link rel="stylesheet" href="style.css"></head>
 <body>
-  <h2><img src="icons/48.png" alt="" class="logo"> SecureDL settings</h2>
+<main class="page">
+  <div class="brand"><img src="icons/48.png" alt="">SecureDL</div>
+  <h1>Settings</h1>
+  <p class="lede">Choose what happens when a download starts. Right-click any link and choose <i>Download with password</i> at any time.</p>
 
-  <label for="mode"><b>When a download starts</b></label>
-  <select id="mode">
-    <option value="off">Do nothing (right-click only)</option>
-    <option value="ask-docs">Ask me for documents &amp; images</option>
-    <option value="ask-all">Ask me for every download</option>
-  </select>
-  <p id="state" class="hint"></p>
-
-  <div id="access" class="box">
-    <div id="accessText"></div>
-    <button id="grant" hidden>Give SecureDL access</button>
-    <p class="hint" id="accessWhy">Automatic detection needs access to all sites so SecureDL can fetch the file that started downloading and encrypt it. Files are never sent anywhere; everything stays on this computer.</p>
+  <div class="choices" role="radiogroup" aria-label="When a download starts">
+    <label class="choice"><input type="radio" name="mode" value="off"><b>Do nothing</b><span>Lock files only when you right-click a link.</span></label>
+    <label class="choice"><input type="radio" name="mode" value="ask-docs"><b>Ask for documents</b><span>PDFs, Office files, spreadsheets and images are stopped before they're saved, and you choose whether to lock them.</span></label>
+    <label class="choice"><input type="radio" name="mode" value="ask-all"><b>Ask for every download</b><span>The same for every file, including installers and archives.</span></label>
   </div>
 
-  <h3>Sites that always save normally</h3>
-  <ul id="never" class="log"></ul>
+  <div id="access" class="callout" hidden><svg class="icon" id="accessIcon"><use href="icons.svg#alert"/></svg>
+    <div><b id="accessTitle"></b><p id="accessText"></p>
+      <button id="grant" class="btn primary" hidden>Give SecureDL access</button></div></div>
 
-  <h3>Recent downloads</h3>
-  <p class="hint">What SecureDL did with each download, and why.</p>
-  <ul id="recent" class="log"></ul>
-  <button id="clearLog" class="secondary">Clear list</button>
+  <h2>Sites you don't want to be asked about</h2>
+  <ul id="never" class="activity"></ul>
 
+  <h2>Recent downloads</h2>
+  <ul id="recent" class="activity"></ul>
+  <p><button id="clearLog" class="btn secondary">Clear the list</button></p>
+
+  <p class="foot fine">SecureDL keeps these settings and the list above only in this browser. Files and passwords never leave this computer.</p>
+</main>
 <script src="settings.js"></script>
 <script src="options.js"></script>
 </body></html>
