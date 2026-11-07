@@ -3,8 +3,8 @@ const ALL_SITES = { origins: ["<all_urls>"] };
 
 const MODE_TEXT = {
   "off": "Only right-click downloads are locked.",
-  "ask-docs": "Downloads of documents & images pause and ask whether to lock them.",
-  "ask-all": "Every download pauses and asks whether to lock it."
+  "ask-docs": "Downloads of documents & images are stopped before anything is saved, and you are asked whether to lock them.",
+  "ask-all": "Every download is stopped before anything is saved, and you are asked whether to lock it."
 };
 
 async function readSettings() {

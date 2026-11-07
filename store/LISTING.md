@@ -15,7 +15,7 @@ Save downloads already password-protected. PDFs open in Preview; other files unl
 
 Bank statements, tax forms, ID scans, contracts… They download to your Desktop or Downloads folder with no password, and they stay there.
 
-SecureDL spots sensitive downloads as they start, pauses them and asks: lock it with a password? Or right-click any link → "Download with password". The file is downloaded into memory, encrypted on your device, and only the locked version is saved.
+SecureDL spots sensitive downloads as they start, stops them before anything is saved, and asks: lock it with a password? Or right-click any link → "Download with password". The file is downloaded into memory, encrypted on your device, and only the locked version is saved.
 
 HOW IT OPENS (no app to install)
 • PDFs are saved as standard AES-256 password-protected PDFs. Double-click and Preview (Mac), Acrobat or Chrome asks for the password.
@@ -56,7 +56,7 @@ Save files the user chooses to download in password-protected (encrypted) form, 
 
 **Permission justifications:**
 - `contextMenus`: adds the "Download with password" item to the right-click menu.
-- `downloads`: saves the encrypted file to the user's Downloads folder. If the user turns on automatic detection, it also pauses a starting download while asking whether to lock it, then either resumes it or cancels it and removes the unprotected copy.
+- `downloads`: saves the encrypted file to the user's Downloads folder. If the user turns on automatic detection, it also stops a starting download (so no unprotected copy is written) and asks whether to lock it; "Save normally" restarts that download.
 - `activeTab`: when the user right-clicks a link, fetches the file from that tab so the request carries the site's normal sign-in and bot-check state.
 - `scripting`: runs the fetch for that file inside the tab the user right-clicked in (same reason as activeTab). No page content is read or changed.
 - `storage`: remembers the detection setting and the user's "don't ask again" site list. No passwords or files are stored.

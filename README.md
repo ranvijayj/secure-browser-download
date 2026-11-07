@@ -10,7 +10,7 @@
 
 On a Mac, the usual routine is: download the PDF, open it in Preview, File → Export, tick *Encrypt*, type a password, save, then delete the original. Most people skip it, and the files sit unprotected in Downloads, or sync to iCloud Drive or Google Drive.
 
-SecureDL turns that into one step. When a document starts downloading, it pauses it and asks whether to lock it. Or you can right-click any link → **Download with password**.
+SecureDL turns that into one step. When a document starts downloading, it stops it before anything is saved and asks whether to lock it. Or you can right-click any link → **Download with password**.
 
 ## How the files open (nothing to install)
 
@@ -35,8 +35,14 @@ Try it: `samples/` has one of each. The password is `test1234`.
   - **Ask me for every download**.
 
   Chrome asks once to give SecureDL access to all sites, which it needs to fetch the file. If access is missing, the toolbar icon shows a red **!**.
-  The download pauses and a "Lock this download?" tab opens. Choose **Encrypt & save**, **Save normally**, or **Always save normally from <site>**. If you close the tab without choosing, the download resumes.
-  Downloads a page builds itself (`blob:` downloads) are handled too. If SecureDL can't fetch the file again, it lets Chrome finish, asks you to pick the file, locks it, and deletes the unprotected copy.
+  The download is **stopped immediately**, so nothing is saved, not even a partial file. Then a "Lock this download?" tab opens:
+  - **Encrypt & save:** SecureDL downloads the file again and saves only the locked copy.
+  - **Save normally:** the download is restarted without a password.
+  - **Always save normally from <site>:** the same, and SecureDL stops asking for that site.
+  - **Close the tab:** nothing is saved.
+
+  Why stop instead of pause? Chrome holds a download for an extension for only about 10 seconds, then saves it anyway. That's too short to type a password.
+  Downloads a page builds itself (`blob:` downloads) are handled too. If the file can't be fetched again (single-use links, files the page already discarded), choose **Download it normally, then lock it**. It's let through once; when it finishes you pick it, it's locked, and the unprotected copy is deleted.
   **Recent downloads** in the popup and Settings shows what SecureDL did with each download and why. Check it first if something wasn't intercepted.
 - **Right-click** any link, image or video → **Download with password**.
 - **Toolbar icon → Lock a file already on disk.**
@@ -52,7 +58,7 @@ Try it: `samples/` has one of each. The password is `test1234`.
 | File larger than 1 GB (everything is processed in memory) | Refused with a clear message |
 | **Self-check:** the encrypted output is opened again with your password. A PDF must not open without the password and must keep its page count. A `.locked.html` file must decrypt to exactly the original bytes (SHA-256) and filename. | If any of this fails, nothing is saved |
 | A file with the same name already exists | Saved as `name (1)…`, never overwritten |
-| Automatic mode: the original finished downloading before it could be paused (very small files) | You're warned, and after locking, the unprotected copy is deleted from disk |
+| Automatic mode: a detected download | Stopped at once (Chrome deletes the partial file); nothing reaches the disk unless you choose Save normally |
 
 ## Security model
 
@@ -62,7 +68,7 @@ Try it: `samples/` has one of each. The password is `test1234`.
 - **Refuses junk.** If a site returns a bot-check, login, error or empty page instead of the file, nothing is saved.
 - **No recovery.** There is no backdoor and no password reset. Lose the password and the file is gone. Use a password manager.
 
-What it does **not** protect against: malware on your computer, or someone watching you type the password. The file is held in memory unencrypted while it's being encrypted. Encryption also adds no protection once you unlock and save the original somewhere. In automatic mode, Chrome may have written the first part of the file to a temporary `.crdownload` file before the pause. That partial file is deleted when you choose Lock.
+What it does **not** protect against: malware on your computer, or someone watching you type the password. The file is held in memory unencrypted while it's being encrypted. Encryption also adds no protection once you unlock and save the original somewhere. In automatic mode, Chrome may briefly write part of the file to a temporary `.crdownload` file before SecureDL stops the download. Stopping it deletes that file. **Save normally** downloads the file a second time.
 
 ## Limitations
 
@@ -79,12 +85,12 @@ npm run build     # dist/securedl-<version>.zip, ready for the Chrome Web Store
 npm run screenshots
 ```
 
-The end-to-end suite loads the extension into Chrome and types passwords with real keystrokes. It runs against a local server that imitates a Cloudflare-protected PDF, a login page, an image, and slow, instant and fake (`MZ`) downloads. For automatic detection it checks:
-- the download pauses, and choosing Lock leaves no unprotected file on disk.
-- Save normally resumes the download.
+The end-to-end suite loads the extension into Chrome and types passwords with real keystrokes. It runs against a local server that imitates a Cloudflare-protected PDF, a login page, an image, and slow, instant and fake (`MZ`) downloads. It uses Chrome's real download handling, not Playwright's override, which skips the step extensions hook into. For automatic detection it checks:
+- a fast 2 MB PDF leaves nothing on disk even after 45 seconds with the form unfilled.
+- Encrypt & save, Save normally and Always save normally each do what they say.
 - installers are ignored in documents-only mode.
-- "don't ask again" is respected.
-- closing the tab resumes the download.
+- page-made and single-use downloads work through the "download then lock" fallback.
+- closing the tab saves nothing.
 
 It also checks that the shipped manifest requests no site access up front.
 

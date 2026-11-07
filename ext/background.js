@@ -2,10 +2,14 @@
 //
 // Detection modes (setting "mode"):
 //   "off"      – right-click only (default)
-//   "ask-docs" – when a document/image/archive download starts, pause it and ask
-//   "ask-all"  – pause and ask for every download
-// Asking opens prompt.html in "ask" mode: "Encrypt & save" (original cancelled/removed,
-// file re-fetched or picked from disk, then encrypted) or "Save normally" (resumed).
+//   "ask-docs" – when a document/image/archive download starts, stop it and ask
+//   "ask-all"  – stop and ask for every download
+// A detected download is CANCELLED immediately (Chrome deletes its partial file) and
+// prompt.html opens in "ask" mode. Chrome gives extensions only ~10 s to hold a download, far
+// too short to type a password, so stopping it is the only way to keep the unprotected file off
+// the disk. "Encrypt & save" re-fetches and saves only the locked copy; "Save normally" restarts
+// the download; if the file can't be fetched again, it is let through once and the user locks
+// the downloaded copy (which is then deleted).
 //
 // Every decision is written to a small activity log (shown in the popup) so it is always
 // visible WHY a download was or wasn't intercepted.
@@ -93,40 +97,138 @@ function isOwnDownload(item) {
     [item.url, item.finalUrl].some((u) => u && (u.startsWith(OWN_BLOB) || u.startsWith(chrome.runtime.getURL(""))));
 }
 
-chrome.downloads.onCreated.addListener(async (item) => {
-  if (isOwnDownload(item)) return;                             // our own encrypted saves
-  const { mode, neverAsk } = await getSettings();
-  if (mode === "off") return;
-  const url = item.finalUrl || item.url;
-  if (!/^(https?|blob|data):/.test(url)) return logDecision(item, "skipped: not a web download");
-  if (mode === "ask-docs" && !isDocument(item)) return logDecision(item, "skipped: not a document or image");
-  const site = hostOf(item.referrer) || hostOf(url);
-  if (neverAsk.includes(site) || neverAsk.includes(hostOf(url))) return logDecision(item, "skipped: you chose “always save normally” for this site");
-  if (!(await chrome.permissions.contains(ALL))) {
-    refreshBadge();
-    return logDecision(item, "NOT intercepted: Chrome access for automatic detection isn't granted (click the icon to fix)");
-  }
+// ---------- Intercepting downloads ----------
+// Names for our own saves. Once an extension listens to onDeterminingFilename, Chrome uses that
+// listener's answer even for the extension's OWN downloads.download() calls, so we must hand the
+// intended filename back here, or the file is saved under the blob's random ID.
+const ownNames = new Map();   // blob URL -> filename
+// Downloads we restart ourselves ("Save normally" / "download then lock"): url -> { filename, then }
+const restarts = new Map();
 
-  // Pause first so as little as possible is written before the user decides.
-  let paused = true;
-  try { await chrome.downloads.pause(item.id); } catch { paused = false; /* already finished */ }
-  const tab = await sourceTab(item);
-  const t = await PROMPT({ url, tabId: tab?.id ?? "", ask: "1", dlId: item.id, name: displayName(item), site });
-  await chrome.storage.session.set({ ["pending:" + t.id]: item.id });
-  logDecision(item, paused ? "asked (download paused)" : "asked (download had already finished)");
+// Settings cached in memory so the common "not intercepting" answer is given immediately.
+let cache = null;
+async function settings() {
+  if (!cache) cache = { ...(await getSettings()), granted: await chrome.permissions.contains(ALL) };
+  return cache;
+}
+chrome.storage.onChanged.addListener(() => { cache = null; });
+chrome.permissions.onAdded.addListener(() => { cache = null; });
+chrome.permissions.onRemoved.addListener(() => { cache = null; });
+
+// One-time passes ("let the next download from this site through"), kept in session storage.
+async function takePass(site) {
+  const { passOnce = {} } = await chrome.storage.session.get("passOnce");
+  const p = passOnce[site];
+  if (!p) return null;
+  delete passOnce[site];
+  await chrome.storage.session.set({ passOnce });
+  return p.exp > Date.now() ? p : null;
+}
+async function addLockWhenDone(id) {
+  const { lockWhenDone = [] } = await chrome.storage.session.get("lockWhenDone");
+  await chrome.storage.session.set({ lockWhenDone: [...lockWhenDone, id] });
+}
+
+async function decide(item) {
+  const url = item.finalUrl || item.url;
+  if (restarts.has(item.url) || restarts.has(url)) {             // downloads we restarted (before the own check)
+    const r = restarts.get(item.url) || restarts.get(url); restarts.delete(item.url); restarts.delete(url);
+    return { restart: r };
+  }
+  if (isOwnDownload(item)) return { own: true };                 // our own encrypted saves
+  const { mode, neverAsk, granted } = await settings();
+  if (mode === "off") return {};
+  if (!/^(https?|blob|data):/.test(url)) return { log: "skipped: not a web download" };
+  if (mode === "ask-docs" && !isDocument(item)) return { log: "skipped: not a document or image" };
+  const site = hostOf(item.referrer) || hostOf(url);
+  if (neverAsk.includes(site) || neverAsk.includes(hostOf(url))) return { log: "skipped: you chose “always save normally” for this site" };
+  const pass = await takePass(site);
+  if (pass) return { pass, log: pass.then === "lock" ? "let through once; you'll be asked to lock it when it finishes" : "let through once (you chose Save normally)" };
+  if (!granted) { refreshBadge(); return { log: "NOT intercepted: Chrome access for automatic detection isn't granted (click the icon to fix)" }; }
+  return { intercept: true, site, url };
+}
+
+chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
+  decide(item).then(async (d) => {
+    if (d.log) logDecision(item, d.log);
+    if (d.own) {
+      const filename = ownNames.get(item.url); ownNames.delete(item.url);
+      return filename ? suggest({ filename, conflictAction: "uniquify" }) : suggest();
+    }
+    if (d.restart) {
+      suggest(d.restart.filename ? { filename: d.restart.filename, conflictAction: "uniquify" } : undefined);
+      if (d.restart.then === "lock") await addLockWhenDone(item.id);
+      return;
+    }
+    if (d.pass) { suggest(); if (d.pass.then === "lock") await addLockWhenDone(item.id); return; }
+    if (!d.intercept) return suggest();
+
+    // Stop it NOW: cancelling deletes Chrome's partial file, so nothing unprotected is left.
+    await chrome.downloads.cancel(item.id).catch(() => {});
+    suggest();
+    chrome.downloads.erase({ id: item.id }).catch(() => {});
+    const tab = await sourceTab(item);
+    const t = await PROMPT({ url: d.url, tabId: tab?.id ?? "", ask: "1", name: displayName(item), site: d.site });
+    await chrome.storage.session.set({ ["pending:" + t.id]: { name: displayName(item), site: d.site } });
+    logDecision(item, "stopped and asked (nothing saved yet)");
+  }).catch((e) => { console.error("SecureDL", e); suggest(); });
+  return true;                                                   // we answer asynchronously
 });
 
-// If the ask tab is closed without a choice, don't leave the user's download stuck on pause.
+// "Download it normally, then lock it": when that download finishes, open the lock page for it.
+chrome.downloads.onChanged.addListener(async (delta) => {
+  if (delta.state?.current !== "complete") return;
+  const { lockWhenDone = [] } = await chrome.storage.session.get("lockWhenDone");
+  if (!lockWhenDone.includes(delta.id)) return;
+  await chrome.storage.session.set({ lockWhenDone: lockWhenDone.filter((x) => x !== delta.id) });
+  const [d] = await chrome.downloads.search({ id: delta.id });
+  if (!d) return;
+  PROMPT({ url: d.finalUrl || d.url, ask: "1", pick: "1", dlId: d.id, name: d.filename.split(/[\\/]/).pop(),
+    site: hostOf(d.referrer) || hostOf(d.finalUrl || d.url) });
+});
+
+// Asked, but the tab was closed without a choice: nothing was saved; note it in the log.
 chrome.tabs.onRemoved.addListener(async (tabId) => {
   const key = "pending:" + tabId;
-  const { [key]: dlId } = await chrome.storage.session.get(key);
-  if (dlId === undefined) return;
+  const { [key]: p } = await chrome.storage.session.get(key);
+  if (!p) return;
   await chrome.storage.session.remove(key);
-  const [d] = await chrome.downloads.search({ id: dlId });
-  if (d && d.state === "in_progress" && d.paused) chrome.downloads.resume(dlId).catch(() => {});
+  logDecision({ filename: p.name, referrer: "https://" + p.site + "/" }, "closed without choosing: nothing was saved");
 });
 
-// Prompt page tells us the choice was handled, so closing its tab shouldn't resume anything.
-chrome.runtime.onMessage.addListener((msg, sender) => {
-  if (msg?.type === "handled" && sender.tab) chrome.storage.session.remove("pending:" + sender.tab.id);
+async function restart(url, filename, then) {
+  restarts.set(url, { filename, then });
+  try { await chrome.downloads.download({ url, conflictAction: "uniquify", ...(filename ? { filename } : {}) }); return true; }
+  catch (e) { restarts.delete(url); console.warn("SecureDL restart failed", e); return false; }
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, reply) => {
+  const tabKey = sender.tab ? "pending:" + sender.tab.id : null;
+  const async = (p) => { p.then(reply, (e) => reply({ ok: false, error: String(e) })); return true; };
+  switch (msg?.type) {
+    case "ownName": ownNames.set(msg.url, msg.filename); reply({ ok: true }); return;
+    case "handled": if (tabKey) chrome.storage.session.remove(tabKey); return;
+    // Save normally: restart a web download ourselves; page-made (blob:) ones are handled by the page.
+    case "savePlain": return async((async () => {
+      if (tabKey) await chrome.storage.session.remove(tabKey);
+      if (!/^https?:/.test(msg.url)) return { ok: false, needsPage: true };
+      return { ok: await restart(msg.url, msg.filename, "plain") };
+    })());
+    // Let it download normally once, then ask to lock the downloaded copy.
+    case "downloadThenLock": return async((async () => {
+      if (tabKey) await chrome.storage.session.remove(tabKey);
+      if (/^https?:/.test(msg.url) && await restart(msg.url, msg.filename, "lock")) return { ok: true, started: true };
+      const { passOnce = {} } = await chrome.storage.session.get("passOnce");
+      passOnce[msg.site] = { then: "lock", exp: Date.now() + 3 * 60 * 1000 };
+      await chrome.storage.session.set({ passOnce });
+      return { ok: true, clickAgain: true };
+    })());
+    case "passOnce": return async((async () => {
+      if (tabKey) await chrome.storage.session.remove(tabKey);
+      const { passOnce = {} } = await chrome.storage.session.get("passOnce");
+      passOnce[msg.site] = { then: "plain", exp: Date.now() + 3 * 60 * 1000 };
+      await chrome.storage.session.set({ passOnce });
+      return { ok: true };
+    })());
+  }
 });

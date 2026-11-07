@@ -6,8 +6,8 @@
   <h2><img src="icons/48.png" alt="" class="logo"> <span id="title">Download with password</span></h2>
   <div id="askInfo" class="box" hidden>
     <div><b id="askName"></b></div>
-    <div class="hint">from <span id="askSite"></span> · download paused</div>
-    <div id="askDone" class="hint" hidden>⚠ It finished downloading before it could be paused. If you lock it, the unprotected copy is deleted.</div>
+    <div class="hint">from <span id="askSite"></span> · <span id="askState">download stopped. Nothing has been saved yet.</span></div>
+    <div id="askDone" class="hint" hidden>⚠ Until you lock it, the unprotected file is in your Downloads folder. Locking deletes it.</div>
   </div>
   <p class="src" id="src"></p>
   <label for="pw">Password <span class="hint">(at least 8 characters, you'll need it to open the file)</span></label>
@@ -27,9 +27,9 @@
     <button id="allow">Allow for this site</button>
   </div>
   <div id="pick" class="box" hidden>
-    <b>Lock the downloaded copy instead</b>
-    <p class="hint" id="pickHint">SecureDL couldn't fetch this file again, but Chrome can finish downloading it. Then pick it here; it will be locked and the unprotected copy deleted.</p>
-    <button id="pickStart" class="secondary">Finish the download, then pick it</button>
+    <div id="pickIntro"><b>Download it normally, then lock it</b></div>
+    <p class="hint" id="pickHint">SecureDL couldn't fetch this file again (some links work only once). It can let the download through once; when it finishes, you pick it here, it's locked, and the unprotected copy is deleted.</p>
+    <button id="pickStart" class="secondary">Download it normally, then lock it</button>
     <div id="pickFileWrap" hidden>
       <p class="hint">Select <b id="pickName"></b> in <span id="pickDir"></span>:</p>
       <input type="file" id="pickFile">

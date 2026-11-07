@@ -156,6 +156,8 @@ function nameFromUrl(url, contentDisposition) {
 
 async function saveEncrypted({ blob, filename }) {
   const url = URL.createObjectURL(blob);
+  // Tell the background the intended name first (see ownNames in background.js).
+  await chrome.runtime.sendMessage({ type: "ownName", url, filename }).catch(() => {});
   // uniquify: never overwrite an existing file with the same name.
   await chrome.downloads.download({ url, filename, saveAs: false, conflictAction: "uniquify" });
   setTimeout(() => URL.revokeObjectURL(url), 60000);

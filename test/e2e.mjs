@@ -33,7 +33,7 @@ const server = http.createServer((req, res) => {
   if (req.url === "/downloads") {
     res.writeHead(200, { "content-type": "text/html" });
     return res.end(["slow-statement.pdf", "slow-report.pdf", "setup.dmg", "tiny.pdf", "fake-invoice.pdf", "slow-other.pdf"]
-      .map((f) => `<a id="${f.split(".")[0]}" href="/dl/${f}" download>${f}</a>`).join("<br>"));
+      .map((f) => `<a id="${f.split(".")[0]}" href="/dl/${f}" download>${f}</a>`).join("<br>") + '<br><a id="fast2mb" href="/file-download/152">Download</a>');
   }
   if (req.url === "/blobs") {
     res.writeHead(200, { "content-type": "text/html" });
@@ -45,6 +45,11 @@ const server = http.createServer((req, res) => {
       }
       keep.onclick = () => make(false); revoke.onclick = () => make(true);
     </script>`);
+  }
+  if (req.url === "/file-download/152") {
+    const big = Buffer.concat([PDF, Buffer.alloc(2 * 1024 * 1024 - PDF.length, 0x20)]);
+    res.writeHead(200, { "content-type": "application/pdf", "content-length": big.length, "content-disposition": 'attachment; filename="2mb.pdf"' });
+    return res.end(big);
   }
   if (req.url.startsWith("/dl/")) {
     const f = req.url.slice(4);
@@ -84,17 +89,34 @@ const ctx = await chromium.launchPersistentContext(profile, {
 });
 let [sw] = ctx.serviceWorkers(); if (!sw) sw = await ctx.waitForEvent("serviceworker");
 const extId = sw.url().split("/")[2];
+// IMPORTANT: Playwright normally takes over downloads, which skips Chrome's filename step that
+// extensions hook (onDeterminingFilename). Restore Chrome's real behaviour so the tests see
+// exactly what a user's Chrome does; files land in dlDir (set in Preferences above).
+const realDownloads = async (c) => (await c.newCDPSession(c.pages()[0] || await c.newPage()))
+  .send("Browser.setDownloadBehavior", { behavior: "default" });
+await realDownloads(ctx);
+
+// Files the extension saved (its own blob: downloads) since a given download id.
+const lastId = () => sw.evaluate(async () => Math.max(0, ...(await chrome.downloads.search({})).map((d) => d.id)));
+async function savedSince(id, wantCount = 1, timeout = 8000) {
+  const end = Date.now() + timeout; let got = [];
+  while (Date.now() < end) {
+    got = await sw.evaluate(async (since) => (await chrome.downloads.search({ state: "complete" }))
+      .filter((d) => d.id > since && d.url.startsWith("blob:chrome-extension")).map((d) => d.filename), id);
+    if (got.length >= wantCount) break;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  return got;
+}
 
 const site = await ctx.newPage(); await site.goto(base + "/page");
 const tabId = await sw.evaluate(async (u) => (await chrome.tabs.query({ url: u }))[0].id, base + "/page");
 
 async function attempt(file, password, { withTab = true } = {}) {
   const p = await ctx.newPage();
-  const downloads = [];
-  p.on("download", (d) => downloads.push(d));
+  const since = await lastId();
   await p.goto(`chrome-extension://${extId}/prompt.html?` +
     new URLSearchParams({ url: base + file, tabId: withTab ? tabId : "" }));
-  // Record the filename the extension asks Chrome to save (Playwright renames the actual files).
   await p.evaluate(() => { const orig = chrome.downloads.download.bind(chrome.downloads);
     window.__asked = []; chrome.downloads.download = (o) => { window.__asked.push(o.filename); return orig(o); }; });
   await p.click("#pw");
@@ -106,11 +128,9 @@ async function attempt(file, password, { withTab = true } = {}) {
   const status = await p.$eval("#status", (e) => e.textContent);
   const asked = await p.evaluate(() => window.__asked);
   const fallbackShown = await p.$eval("#fallback", (e) => !e.hidden).catch(() => false);
-  await new Promise((r) => setTimeout(r, 800));
-  const newFiles = [];
-  for (const d of downloads) { const tmp = path.join(dlDir, String(Math.random())); await d.saveAs(tmp); newFiles.push(asked[newFiles.length] ?? "?"); fs.renameSync(tmp, path.join(dlDir, newFiles.at(-1))); }
+  const paths = status.includes("✅") ? await savedSince(since) : (await new Promise((r) => setTimeout(r, 800)), await savedSince(since, 1, 0));
   if (!p.isClosed()) await p.close();
-  return { typed, status, fallbackShown, newFiles };
+  return { typed, status, fallbackShown, newFiles: paths.map((f) => path.basename(f)), paths, asked };
 }
 
 // 1. Typing works (the original bug)
@@ -119,9 +139,9 @@ ok(r1.typed === "hunter22", "real keyboard typing reaches the password box");
 
 // 2. Cloudflare-style protected PDF succeeds via the page context
 ok(r1.status.includes("✅"), "bot-protected PDF downloaded via page context: " + r1.status.trim());
-ok(r1.newFiles.length === 1 && r1.newFiles[0].endsWith("(locked).pdf"), "saved locked PDF: " + r1.newFiles);
-if (r1.newFiles[0]) {
-  const f = path.join(dlDir, r1.newFiles[0]);
+ok(r1.newFiles.length === 1 && r1.newFiles[0] === "protected (locked).pdf", "saved locked PDF: " + r1.newFiles);
+if (r1.paths[0]) {
+  const f = r1.paths[0];
   const info = execFileSync("qpdf", ["--show-encryption", "--password=hunter22", f]).toString();
   ok(/R = 6/.test(info), "saved PDF is AES-256 encrypted with the typed password");
   execFileSync("qpdf", ["--password=hunter22", "--decrypt", "--qdf", f, path.join(os.tmpdir(), "e2e-dec.pdf")]);
@@ -142,17 +162,18 @@ const r4 = await attempt("/photo.jpg", "hunter22");
 ok(r4.newFiles[0] === "photo.jpg.locked.html", "non-PDF saved as " + r4.newFiles);
 
 // 6. Unlock the vault in Chrome with real typing (vault had the same typing bug)
-if (r4.newFiles[0]) {
+if (r4.paths[0]) {
   const v = await ctx.newPage();
-  await v.goto("file://" + path.join(dlDir, r4.newFiles[0]));
+  await v.goto("file://" + r4.paths[0]);
   await v.click("#p"); await v.keyboard.type("wrong-pw"); await v.keyboard.press("Enter");
   await v.waitForFunction(() => document.getElementById("m").textContent.includes("❌"));
   ok(true, "vault rejects wrong password in Chrome");
   await v.fill("#p", ""); await v.click("#p"); await v.keyboard.type("hunter22", { delay: 20 });
-  const [dl] = await Promise.all([v.waitForEvent("download", { timeout: 20000 }).catch(() => null), v.keyboard.press("Enter")]);
+  await v.keyboard.press("Enter");
   await v.waitForFunction(() => document.getElementById("m").textContent.includes("✅"));
-  const bytes = dl ? fs.readFileSync(await dl.path()) : null;
-  ok(dl && dl.suggestedFilename() === "photo.jpg" && bytes.equals(Buffer.from([0xff, 0xd8, 0xff, 1, 2, 3, 4, 5])),
+  const out = path.join(dlDir, "photo.jpg");
+  for (let i = 0; i < 40 && !fs.existsSync(out); i++) await new Promise((r) => setTimeout(r, 200));
+  ok(fs.existsSync(out) && fs.readFileSync(out).equals(Buffer.from([0xff, 0xd8, 0xff, 1, 2, 3, 4, 5])),
     "vault unlocks in Chrome (typed password) and restores exact photo.jpg");
 }
 
@@ -163,69 +184,69 @@ const dlState = (name) => sw.evaluate(async (n) => (await chrome.downloads.searc
 const dlPage = await ctx.newPage(); await dlPage.goto(base + "/downloads");
 const askTab = () => ctx.waitForEvent("page", { predicate: (pg) => pg.url().includes("ask=1"), timeout: 8000 }).catch(() => null);
 async function lockIn(p, pw = "tangerine-kayak-41") {
-  const dls = []; p.on("download", (d) => dls.push(d));
+  const since = await lastId();
   await p.evaluate(() => { const o = chrome.downloads.download.bind(chrome.downloads);
     window.__asked = []; chrome.downloads.download = (x) => { window.__asked.push(x.filename); return o(x); }; });
   await p.fill("#pw", pw); await p.fill("#pw2", pw); await p.click("#go");
   await p.waitForFunction(() => /✅|❌/.test(document.getElementById("status").textContent), null, { timeout: 30000 });
   const out = { status: await p.$eval("#status", (e) => e.textContent), asked: await p.evaluate(() => window.__asked) };
-  await new Promise((r) => setTimeout(r, 1800));
+  out.saved = out.status.includes("✅") ? await savedSince(since) : [];
+  await new Promise((r) => setTimeout(r, 1500));
   return out;
 }
 
+const inDir = (n) => fs.existsSync(path.join(dlDir, n));
+const waitFile = async (n, ms = 10000) => { for (let i = 0; i < ms / 200 && !inDir(n); i++) await new Promise((r) => setTimeout(r, 200)); return inDir(n); };
+const partials = () => fs.readdirSync(dlDir).filter((f) => f.endsWith(".crdownload"));
+
 await setMode("ask-docs");
-// A. slow PDF -> paused, asked, locked; original cancelled and removed
+// A. PDF -> stopped immediately, asked, locked
 let tabP = askTab(); await dlPage.click("#slow-statement");
 let ask = await tabP;
 ok(!!ask, "ask mode: download of a PDF opens the 'Lock this download?' tab");
 if (ask) {
   await ask.waitForLoadState();
-  ok((await ask.$eval("#askName", (e) => e.textContent)).includes("slow-statement"), "ask tab names the file");
-  const paused = (await dlState("slow-statement.pdf"))[0];
-  ok(paused?.paused === true, "original download is paused while asking");
-  const r = await lockIn(ask);
-  ok(r.status.includes("✅") && r.asked[0] === "slow-statement (locked).pdf", "chose Lock: saved " + r.asked[0]);
+  ok((await ask.$eval("#askName", (e) => e.textContent)) === "slow-statement.pdf", "ask tab names the file");
   const st = await dlState("slow-statement.pdf");
-  ok((st.length === 0 || st.every((d) => d.state !== "complete")) && !(paused?.file && fs.existsSync(paused.file)),
-    "unprotected original was cancelled and nothing is left on disk");
+  ok(st.every((d) => d.state !== "in_progress" && d.state !== "complete") && !inDir("slow-statement.pdf") && partials().length === 0,
+    "original download was stopped at once: nothing (not even a partial file) on disk");
+  const r = await lockIn(ask);
+  ok(r.status.includes("✅") && path.basename(r.saved[0] || "") === "slow-statement (locked).pdf" && fs.existsSync(r.saved[0]), "chose Lock: saved " + path.basename(r.saved[0] || "-"));
+  ok(!inDir("slow-statement.pdf"), "no unprotected slow-statement.pdf in the downloads folder");
 }
-// B. slow PDF -> Save normally -> resumes and completes
+// B. Save normally -> download restarted under its real name
 tabP = askTab(); await dlPage.click("#slow-report");
 ask = await tabP;
 if (ask) {
   await ask.waitForLoadState(); await ask.click("#skip");
-  await new Promise((r) => setTimeout(r, 6000));
-  const st = await dlState("slow-report.pdf");
-  ok(st[0]?.state === "complete", "chose Save normally: original download resumed and completed");
+  ok(await waitFile("slow-report.pdf", 12000), "chose Save normally: download restarted and saved as slow-report.pdf");
 } else ok(false, "ask tab for slow-report.pdf");
 // C. installer is ignored in documents-only mode
 tabP = askTab(); await dlPage.click("#setup");
-ok(!(await tabP), "documents-only mode ignores a .dmg installer");
-// D. tiny file finishes before pause -> lock deletes the plaintext copy from disk
+ok(!(await tabP) && await waitFile("setup.dmg"), "documents-only mode ignores a .dmg installer (saved normally)");
+// D. instant tiny file -> nothing lands while the form is unfilled
 tabP = askTab(); await dlPage.click("#tiny");
 ask = await tabP;
 if (ask) {
-  await ask.waitForLoadState(); await new Promise((r) => setTimeout(r, 800));
-  const before = await dlState("tiny.pdf");
-  const plainPath = before[0]?.file;
-  ok(before[0]?.state === "complete" && plainPath && fs.existsSync(plainPath) && await ask.$eval("#askDone", (e) => !e.hidden),
-    "tiny file finished before pause; the ask tab warns about it");
+  await ask.waitForLoadState(); await new Promise((r) => setTimeout(r, 2500));
+  ok(!inDir("tiny.pdf") && partials().length === 0, "instant tiny download: nothing on disk while the form is unfilled");
   const r = await lockIn(ask);
-  ok(r.status.includes("✅") && !fs.existsSync(plainPath), "after locking, the unprotected file is gone from disk: " + plainPath);
+  ok(r.status.includes("✅") && !inDir("tiny.pdf"), "after locking, no unprotected tiny.pdf exists");
 } else ok(false, "ask tab for tiny.pdf");
 // E. program disguised as a PDF is refused
 tabP = askTab(); await dlPage.click("#fake-invoice");
 ask = await tabP;
 if (ask) {
   await ask.waitForLoadState(); const r = await lockIn(ask);
-  ok(r.status.includes("actually a program") && r.asked.length === 0, "disguised program refused: " + r.status.trim());
+  ok(r.status.includes("actually a program") && r.asked.length === 0 && !inDir("fake-invoice.pdf"), "disguised program refused: " + r.status.trim());
   await ask.close();
 } else ok(false, "ask tab for fake-invoice.pdf");
-// F. "don't ask again for this site" is respected
+// F. "always save normally" site is not asked about
 await setMode("ask-docs", [new URL(base).host]);
 tabP = askTab(); await dlPage.click("#slow-other");
-ok(!(await tabP), "'Don't ask again' site is not asked about");
-// G. closing the ask tab without choosing resumes the download
+ok(!(await tabP) && await waitFile("slow-other.pdf"), "'always save normally' site is not asked about (saved normally)");
+fs.rmSync(path.join(dlDir, "slow-other.pdf"));
+// G. closing the ask tab without choosing: nothing is saved, and the log says so
 await setMode("ask-all");
 await sw.evaluate(() => chrome.downloads.erase({}));
 tabP = askTab(); await dlPage.click("#slow-other");
@@ -233,8 +254,30 @@ ask = await tabP;
 if (ask) {
   await ask.waitForLoadState(); await new Promise((r) => setTimeout(r, 500)); await ask.close();
   await new Promise((r) => setTimeout(r, 6000));
-  ok((await dlState("slow-other.pdf"))[0]?.state === "complete", "closing the ask tab resumes the paused download");
+  const { log: l } = await sw.evaluate(() => chrome.storage.local.get("log"));
+  ok(!inDir("slow-other.pdf") && partials().length === 0 && l[0]?.decision.includes("closed without choosing"),
+    "closing the ask tab saves nothing and is logged: " + l[0]?.decision);
 } else ok(false, "ask tab for slow-other.pdf (ask-all)");
+// M. User's case: fast 2 MB PDF from a URL with no extension (/file-download/152), slow typist
+await setMode("ask-docs", []);
+await sw.evaluate(() => chrome.downloads.erase({}));
+tabP = askTab(); await dlPage.click("#fast2mb");
+ask = await tabP;
+ok(!!ask, "fast 2 MB PDF download (no extension in URL) opens the ask tab");
+if (ask) {
+  await ask.waitForLoadState();
+  const name = await ask.$eval("#askName", (e) => e.textContent);
+  ok(name === "2mb.pdf", "ask tab shows the real filename from the server: " + name);
+  // Longer than Chrome's ~10 s limit for holding a download and its ~30 s worker idle limit.
+  await new Promise((r) => setTimeout(r, 45000));
+  const files = fs.readdirSync(dlDir).filter((f) => f.startsWith("2mb") || f.endsWith(".crdownload"));
+  ok(files.length === 0, "after 45 s with the form unfilled, nothing is on disk: " + JSON.stringify(files));
+  const r = await lockIn(ask);
+  ok(r.status.includes("✅") && path.basename(r.saved[0] || "") === "2mb (locked).pdf", "locked as '2mb (locked).pdf' after 45 s");
+  const left = fs.readdirSync(dlDir).filter((f) => (f.startsWith("2mb") && f !== "2mb (locked).pdf") || f.endsWith(".crdownload"));
+  ok(left.length === 0, "downloads folder has no unprotected 2mb.pdf or partial file: " + JSON.stringify(left));
+}
+
 // H. Right-click flow while detection is on: no second "Lock this download?" tab, no "always save normally" link
 await setMode("ask-all", []);
 {
@@ -258,34 +301,53 @@ ask = await tabP;
 ok(!!ask, "page-made (blob:) download opens the ask tab");
 if (ask) {
   await ask.waitForLoadState(); await new Promise((r) => setTimeout(r, 600));
-  const rec = (await sw.evaluate(async () => (await chrome.downloads.search({})).filter((d) => d.url.startsWith("blob:http"))
-    .map((d) => d.filename)))[0] || "";
+  ok((await ask.$eval("#askName", (e) => e.textContent)) === "page-made.txt", "ask tab shows the page-made file's real name");
   const r = await lockIn(ask);
-  // Real Chrome names it page-made.txt; Playwright renames files on disk to random IDs, so compare with Chrome's record.
-  ok(r.status.includes("✅") && r.asked[0] === rec.split("/").pop() + ".locked.html" && !/^[0-9a-f-]{36}\.locked/.test(r.asked[0]) === !/^[0-9a-f-]{36}$/.test(rec.split("/").pop()),
-    "page-made file locked via the page, named after Chrome's download: " + r.asked[0]);
+  ok(r.status.includes("✅") && path.basename(r.saved[0] || "") === "page-made.txt.locked.html",
+    "page-made file locked via the page: " + path.basename(r.saved[0] || "-"));
+  ok(!fs.existsSync(path.join(dlDir, "page-made.txt")), "no unprotected page-made.txt in the downloads folder");
   const left = (await blobState("page-made.txt")).filter((d) => d.file && fs.existsSync(d.file));
   ok(left.length === 0, "no unprotected page-made file left on disk");
 }
-// J. Page-made download whose blob is already revoked -> fallback: pick the downloaded file
+// J. Page-made download whose blob is already revoked -> "download it normally, then lock it"
 await sw.evaluate(() => chrome.downloads.erase({}));
 tabP = askTab(); await blobPage.click("#revoke");
 ask = await tabP;
 if (ask) {
   await ask.waitForLoadState(); await new Promise((r) => setTimeout(r, 600));
-  const dls = []; ask.on("download", (d) => dls.push(d));
   await ask.fill("#pw", "tangerine-kayak-41"); await ask.fill("#pw2", "tangerine-kayak-41"); await ask.click("#go");
   await ask.waitForFunction(() => /❌|✅/.test(document.getElementById("status").textContent), null, { timeout: 20000 });
-  ok(await ask.$eval("#pick", (e) => !e.hidden), "revoked page-made file: offers 'lock the downloaded copy instead'");
+  ok(await ask.$eval("#pick", (e) => !e.hidden), "revoked page-made file can't be fetched: offers 'download it normally, then lock it'");
   await ask.click("#pickStart");
-  await ask.waitForFunction(() => !document.getElementById("pickFileWrap").hidden, null, { timeout: 15000 });
-  const [orig] = (await sw.evaluate(async () => (await chrome.downloads.search({ state: "complete" })).map((d) => d.filename)));
-  await ask.setInputFiles("#pickFile", orig);
-  await ask.waitForFunction(() => /❌|✅/.test(document.getElementById("status").textContent) && /Saved|not the/.test(document.getElementById("status").textContent), null, { timeout: 20000 });
-  const st = await ask.$eval("#status", (e) => e.textContent);
-  await new Promise((r) => setTimeout(r, 800));
-  ok(st.includes("✅") && dls.length === 1 && !fs.existsSync(orig), "picked file locked and unprotected copy deleted: " + st.trim());
+  await ask.waitForFunction(() => /click the download button/i.test(document.getElementById("pickHint").textContent), null, { timeout: 5000 });
+  ok(true, "tells the user to click the site's download button again");
+  const lockP = ctx.waitForEvent("page", { predicate: (pg) => pg.url().includes("pick=1"), timeout: 10000 }).catch(() => null);
+  await blobPage.click("#revoke");                              // user clicks again; this one is let through
+  const lockPage = await lockP;
+  ok(!!lockPage && inDir("page-made-revoked.txt"), "let-through download finished and a 'Lock the downloaded file' page opened");
+  if (lockPage) {
+    await lockPage.waitForLoadState();
+    await lockPage.waitForFunction(() => !document.getElementById("pickFileWrap").hidden, null, { timeout: 5000 });
+    const since = await lastId();
+    await lockPage.fill("#pw", "tangerine-kayak-41"); await lockPage.fill("#pw2", "tangerine-kayak-41");
+    await lockPage.setInputFiles("#pickFile", path.join(dlDir, "page-made-revoked.txt"));
+    await lockPage.waitForFunction(() => /Saved|not the|❌/.test(document.getElementById("status").textContent), null, { timeout: 20000 });
+    const st = await lockPage.$eval("#status", (e) => e.textContent);
+    const saved = await savedSince(since);
+    await new Promise((r) => setTimeout(r, 800));
+    ok(st.includes("✅") && path.basename(saved[0] || "") === "page-made-revoked.txt.locked.html" && !inDir("page-made-revoked.txt"),
+      "picked file locked and the unprotected copy deleted: " + st.trim());
+  }
+  if (!ask.isClosed()) await ask.close();
 } else ok(false, "ask tab for revoked page-made download");
+// N. Page-made download -> Save normally (fetched from the page, saved as-is)
+await sw.evaluate(() => chrome.downloads.erase({}));
+tabP = askTab(); await blobPage.click("#keep");
+ask = await tabP;
+if (ask) {
+  await ask.waitForLoadState(); await ask.click("#skip");
+  ok(await waitFile("page-made (1).txt", 8000) || await waitFile("page-made.txt", 100), "page-made file, Save normally: saved without a password");
+} else ok(false, "ask tab for page-made Save normally");
 // K. "Always save normally from <site>" resumes and stops asking
 await setMode("ask-docs", []);
 await sw.evaluate(() => chrome.downloads.erase({}));
@@ -293,17 +355,16 @@ tabP = askTab(); await dlPage.click("#slow-other");
 ask = await tabP;
 if (ask) {
   await ask.waitForLoadState(); await ask.click("#never");
-  await new Promise((r) => setTimeout(r, 6000));
+  const done = await waitFile("slow-other.pdf", 12000);
   const { neverAsk } = await sw.evaluate(() => chrome.storage.local.get("neverAsk"));
-  ok(neverAsk?.includes(new URL(base).host) && (await dlState("slow-other.pdf"))[0]?.state === "complete",
-    "'Always save normally' saves the site and lets the download finish");
+  ok(neverAsk?.includes(new URL(base).host) && done, "'Always save normally' remembers the site and saves the download");
   tabP = askTab(); await dlPage.click("#slow-report");
   ok(!(await tabP), "...and the next download from that site isn't asked about");
 } else ok(false, "ask tab for 'always save normally'");
 // L. Activity log explains decisions
 const { log: actLog } = await sw.evaluate(() => chrome.storage.local.get("log"));
 ok(actLog.some((e) => e.decision.includes("not a document")) && actLog.some((e) => e.decision.includes("always save normally")) &&
-   actLog.some((e) => e.decision.startsWith("asked")), "activity log records why each download was or wasn't intercepted");
+   actLog.some((e) => e.decision.startsWith("stopped and asked")), "activity log records why each download was or wasn't intercepted");
 await setMode("off", []);
 
 await ctx.close();
@@ -316,11 +377,12 @@ await ctx.close();
     args: ["--headless=new", `--disable-extensions-except=${realExt}`, `--load-extension=${realExt}`, "--no-sandbox"] });
   let [w2] = c2.serviceWorkers(); if (!w2) w2 = await c2.waitForEvent("serviceworker");
   const id2 = w2.url().split("/")[2];
+  await realDownloads(c2);
   const perms = await w2.evaluate(() => chrome.runtime.getManifest());
   ok(!perms.host_permissions && perms.optional_host_permissions?.[0] === "<all_urls>",
     "shipped manifest requests no site access up front (optional only)");
   const p = await c2.newPage();
-  const dls = []; p.on("download", (d) => dls.push(d));
+  const dls = [];
   await p.goto(`chrome-extension://${id2}/prompt.html?` + new URLSearchParams({ url: base + "/protected.pdf", tabId: "" }));
   await p.click("#pw"); await p.keyboard.type("hunter22"); await p.fill("#pw2", "hunter22"); await p.keyboard.press("Enter");
   await p.waitForFunction(() => !document.getElementById("access").hidden || /❌|✅/.test(document.getElementById("status").textContent), null, { timeout: 15000 });

@@ -39,7 +39,7 @@ await shot(frame(`
     <div style="flex:0 0 520px">
       <img src="data:image/png;base64,${icon}" style="width:84px">
       <h1 style="font-size:48px;line-height:1.12;margin:24px 0 18px;white-space:nowrap">Downloads that arrive<br>already locked.</h1>
-      <p style="font-size:21px;opacity:.92;line-height:1.55;white-space:nowrap">Spots sensitive downloads, pauses them,<br>and asks to <b>lock them with a password</b>.<br>
+      <p style="font-size:21px;opacity:.92;line-height:1.55;white-space:nowrap">Stops sensitive downloads before they’re saved<br>and asks to <b>lock them with a password</b>.<br>
       Or right-click any link → <b>Download with password</b>.</p>
     </div>${card(prompt, 600)}</div>`), "screenshot-1.png");
 
