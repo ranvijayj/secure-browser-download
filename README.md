@@ -2,6 +2,8 @@
 
 # SecureDL
 
+[![Chrome Web Store](https://img.shields.io/chrome-web-store/v/olcbfjjoidcpkkadibkgpkpacmmahpga?label=Chrome%20Web%20Store)](https://chromewebstore.google.com/detail/olcbfjjoidcpkkadibkgpkpacmmahpga)
+
 **Downloads that arrive already locked.** A Chrome extension that saves sensitive downloads, like bank statements, tax forms and ID scans, password-protected. It can spot them automatically and ask, or you can right-click any link. Everything runs locally.
 
 ![SecureDL](store/screenshot-1.png)
@@ -29,8 +31,8 @@ Try it: `samples/` has one of each. The password is `test1234`.
 
 ## Install
 
-- **Chrome Web Store:** _coming soon_
-- **Power users (now):**
+- **Chrome Web Store (recommended):** [Add SecureDL to Chrome](https://chromewebstore.google.com/detail/olcbfjjoidcpkkadibkgpkpacmmahpga). It updates automatically.
+- **Power users (unpacked, no automatic updates):**
   1. Download `SecureDL-vX.Y.Z.zip` from [Releases](https://github.com/ranvijayj/secure-browser-download/releases/latest) and unzip it.
   2. Go to `chrome://extensions` and turn on **Developer mode**.
   3. Click **Load unpacked** and select the unzipped folder.

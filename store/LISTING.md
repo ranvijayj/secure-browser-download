@@ -1,5 +1,7 @@
 # Chrome Web Store submission: copy/paste sheet
 
+Live listing: https://chromewebstore.google.com/detail/olcbfjjoidcpkkadibkgpkpacmmahpga
+
 ## Store listing tab
 
 **Name:** SecureDL – Password-protected downloads

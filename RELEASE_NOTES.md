@@ -1,6 +1,8 @@
 **SecureDL saves sensitive downloads password-locked.** It stops a bank statement or tax form before it's saved and asks for a password. Only the locked copy reaches your disk. Everything happens on your computer.
 
-## Install (power users, before the Chrome Web Store listing is live)
+**Most people should install from the [Chrome Web Store](https://chromewebstore.google.com/detail/olcbfjjoidcpkkadibkgpkpacmmahpga)**, which updates automatically.
+
+## Install unpacked (power users)
 1. Download **SecureDL-v1.4.1.zip** below and unzip it.
 2. Open `chrome://extensions` and turn on **Developer mode** (top right).
 3. Click **Load unpacked** and select the unzipped **SecureDL-v1.4.1** folder (the one that contains `manifest.json`).
