@@ -183,3 +183,17 @@ body.compact .foot { margin-top: var(--s6); }
 .steps .hint { margin: 0 0 10px; }
 .done-chip { display: inline-flex; gap: 6px; align-items: center; color: var(--green); font-weight: 500; font-size: 13px; }
 .done-chip .icon { width: 16px; height: 16px; }
+
+/* Welcome: two columns so it fits without scrolling */
+.welcome { max-width: 860px; margin: 40px auto 32px; }
+.wtitle { display: flex; align-items: center; gap: var(--s3); margin: 0 0 var(--s2); }
+.wtitle img { width: 28px; height: 28px; }
+.welcome .lede { margin-bottom: var(--s5); }
+.welcome .steps { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); column-gap: var(--s6); row-gap: var(--s5); align-items: start; }
+.welcome .steps > li:first-child { grid-row: span 2; }
+.welcome .choice { padding: 10px var(--s3); align-items: center; }
+.welcome .choice input { grid-row: auto; margin: 0; }
+.welcome .choice span { grid-column: 2; }
+.welcome .fine { margin: var(--s2) 0 0; }
+.welcome > .fine { margin-top: var(--s4); }
+@media (max-width: 720px) { .welcome .steps { grid-template-columns: 1fr; } .welcome .steps > li:first-child { grid-row: auto; } }

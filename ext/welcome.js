@@ -12,7 +12,7 @@ async function load() {
   $("try").disabled = need && !s.granted;
   $("tryHint").textContent = s.mode === "off"
     ? "Right-click any link to a file and choose Download with password."
-    : "Download a sample PDF. SecureDL will stop it and ask for a password, just like it will on your bank's site.";
+    : "SecureDL will stop this download and ask for a password.";
   $("try").hidden = s.mode === "off";
 }
 load();

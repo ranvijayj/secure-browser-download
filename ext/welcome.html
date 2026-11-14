@@ -3,26 +3,26 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" href="icons/32.png"><link rel="stylesheet" href="style.css"></head>
 <body>
-<main class="page">
-  <div class="brand"><img src="icons/48.png" alt="">SecureDL</div>
-  <h1>Welcome to SecureDL</h1>
+<main class="page welcome">
+  <h1 class="wtitle"><img src="icons/48.png" alt="">Welcome to SecureDL</h1>
   <p class="lede">Three quick steps and your sensitive downloads are saved with a password.</p>
   <ol class="steps">
-    <li><div><h3 id="modeLabel">When a download starts, SecureDL should…</h3>
+    <li><div><h3 id="modeLabel">When a download starts…</h3>
       <div class="choices" role="radiogroup" aria-labelledby="modeLabel">
-        <label class="choice"><input type="radio" name="mode" value="off"><b>Do nothing</b><span>Lock files only when you right-click a link.</span></label>
-        <label class="choice"><input type="radio" name="mode" value="ask-docs"><b>Ask for documents</b><span>PDFs, Office files, spreadsheets, images. Recommended.</span></label>
-        <label class="choice"><input type="radio" name="mode" value="ask-all"><b>Ask for every download</b><span>Including installers and archives.</span></label>
-      </div></div></li>
+        <label class="choice"><input type="radio" name="mode" value="off"><b>Do nothing</b><span>Right-click only</span></label>
+        <label class="choice"><input type="radio" name="mode" value="ask-docs"><b>Ask for documents</b><span>Recommended</span></label>
+        <label class="choice"><input type="radio" name="mode" value="ask-all"><b>Ask for every download</b></label>
+      </div>
+      <p class="fine">Documents means PDFs, Office files, spreadsheets and images.</p></div></li>
     <li id="stepAccess"><div><h3>Give SecureDL access</h3>
-      <p class="hint">Chrome asks once. It lets SecureDL stop a download and fetch the file to lock it. <b>Everything stays on your computer. Nothing is uploaded or sent anywhere.</b></p>
+      <p class="hint">Chrome asks once. <b>Everything stays on your computer. Nothing is uploaded.</b></p>
       <button class="btn primary" id="grant">Give access</button>
       <span class="done-chip" id="granted" hidden><svg class="icon"><use href="icons.svg#check"/></svg>Access granted</span></div></li>
     <li><div><h3>Try it</h3>
-      <p class="hint" id="tryHint">Download a sample PDF. SecureDL will stop it and ask for a password, just like it will on your bank's site.</p>
+      <p class="hint" id="tryHint">SecureDL will stop this download and ask for a password.</p>
       <button class="btn secondary" id="try"><svg class="icon"><use href="icons.svg#file"/></svg>Download a sample PDF</button></div></li>
   </ol>
-  <p class="fine">Pin SecureDL from Chrome's puzzle-piece menu so you can change this later. You can also right-click any link and choose <i>Download with password</i>.</p>
+  <p class="fine">Pin SecureDL from the puzzle-piece menu to change this later, or right-click any link and choose <i>Download with password</i>.</p>
 </main>
 <script src="settings.js"></script>
 <script src="welcome.js"></script>
