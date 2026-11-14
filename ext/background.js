@@ -17,13 +17,8 @@
 // The lock page opens as a compact window over the page you were on (a quick question, not a
 // new page). Returns its tab, so callers can track it like before.
 async function PROMPT(params) {
-  const url = "prompt.html?" + new URLSearchParams({ ...params, w: "1" }).toString();
-  try {
-    const win = await chrome.windows.create({ url, type: "popup", width: 480, height: 720, focused: true });
-    return win.tabs[0];
-  } catch {
-    return chrome.tabs.create({ url, active: true });           // e.g. no normal window available
-  }
+  // Opens next to the page the download came from, as a normal tab (a separate window felt like more friction).
+  return chrome.tabs.create({ url: "prompt.html?" + new URLSearchParams(params).toString(), active: true });
 }
 const ALL = { origins: ["<all_urls>"] };
 

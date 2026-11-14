@@ -379,8 +379,7 @@ ok(ctx.pages().some((pg) => pg.url().endsWith("/welcome.html")), "welcome tab op
   const w = ctx.pages().find((pg) => pg.url().endsWith("/welcome.html"));
   if (w) { await w.reload(); ok(await w.$$eval('input[name="mode"]', (r) => r.length === 3), "welcome page shows the three modes"); }
   const p = await ctx.newPage();
-  await p.goto(`chrome-extension://${extId}/prompt.html?` + new URLSearchParams({ url: base + "/protected.pdf", tabId, w: "1" }));
-  ok(await p.evaluate(() => document.body.classList.contains("compact")), "lock window uses the compact layout");
+  await p.goto(`chrome-extension://${extId}/prompt.html?` + new URLSearchParams({ url: base + "/protected.pdf", tabId }));
   await p.click("#suggest");
   const [a, b, str, shown] = await p.evaluate(() => [pw.value, pw2.value, document.querySelector("#meter, .meter")?.textContent || document.body.innerText, !suggestBox.hidden]);
   ok(a && a === b && /^[a-z]+(-[a-z]+){3}-\d\d$/.test(a) && shown, "suggest fills both fields with a 4-word passphrase: " + a);
