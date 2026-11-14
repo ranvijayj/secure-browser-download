@@ -373,6 +373,26 @@ ok(actLog.some((e) => e.decision.includes("not a document")) && actLog.some((e) 
    actLog.some((e) => e.decision.startsWith("stopped and asked")), "activity log records why each download was or wasn't intercepted");
 await setMode("off", []);
 
+// M. v1.5: welcome tab, suggested password, review prompt, compact window
+ok(ctx.pages().some((pg) => pg.url().endsWith("/welcome.html")), "welcome tab opens on install");
+{
+  const w = ctx.pages().find((pg) => pg.url().endsWith("/welcome.html"));
+  if (w) { await w.reload(); ok(await w.$$eval('input[name="mode"]', (r) => r.length === 3), "welcome page shows the three modes"); }
+  const p = await ctx.newPage();
+  await p.goto(`chrome-extension://${extId}/prompt.html?` + new URLSearchParams({ url: base + "/protected.pdf", tabId, w: "1" }));
+  ok(await p.evaluate(() => document.body.classList.contains("compact")), "lock window uses the compact layout");
+  await p.click("#suggest");
+  const [a, b, str, shown] = await p.evaluate(() => [pw.value, pw2.value, document.querySelector("#meter, .meter")?.textContent || document.body.innerText, !suggestBox.hidden]);
+  ok(a && a === b && /^[a-z]+(-[a-z]+){3}-\d\d$/.test(a) && shown, "suggest fills both fields with a 4-word passphrase: " + a);
+  await sw.evaluate(() => chrome.storage.local.set({ lockCount: 4, reviewAsked: false }));
+  await p.click("#pw2"); await p.keyboard.press("Enter");
+  await p.waitForFunction(() => ["ok","error"].includes(document.getElementById("status").dataset.state), null, { timeout: 30000 });
+  ok(await p.$eval("#rate", (e) => !e.hidden), "review prompt appears after the 5th lock");
+  const st = await sw.evaluate(() => chrome.storage.local.get(["lockCount", "reviewAsked"]));
+  ok(st.reviewAsked === true, "review prompt is only shown once");
+  if (!p.isClosed()) await p.close();
+}
+
 await ctx.close();
 
 // 7. Real manifest (no blanket access): extension asks for this one site, saves nothing.

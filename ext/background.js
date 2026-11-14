@@ -14,8 +14,17 @@
 // Every decision is written to a small activity log (shown in the popup) so it is always
 // visible WHY a download was or wasn't intercepted.
 
-const PROMPT = (params) =>
-  chrome.tabs.create({ url: "prompt.html?" + new URLSearchParams(params).toString(), active: true });
+// The lock page opens as a compact window over the page you were on (a quick question, not a
+// new page). Returns its tab, so callers can track it like before.
+async function PROMPT(params) {
+  const url = "prompt.html?" + new URLSearchParams({ ...params, w: "1" }).toString();
+  try {
+    const win = await chrome.windows.create({ url, type: "popup", width: 480, height: 720, focused: true });
+    return win.tabs[0];
+  } catch {
+    return chrome.tabs.create({ url, active: true });           // e.g. no normal window available
+  }
+}
 const ALL = { origins: ["<all_urls>"] };
 
 // Document-like types that are worth asking about in "ask-docs" mode.
@@ -65,7 +74,9 @@ chrome.permissions.onRemoved.addListener(refreshBadge);
 chrome.storage.onChanged.addListener((c) => { if (c.mode) refreshBadge(); });
 chrome.runtime.onStartup.addListener(refreshBadge);
 
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener((details) => {
+  // First install: open the welcome tab (choose a mode, give access, try it).
+  if (details.reason === "install") chrome.tabs.create({ url: "welcome.html" });
   chrome.contextMenus.create({
     id: "securedl",
     title: "Download with password (SecureDL)",

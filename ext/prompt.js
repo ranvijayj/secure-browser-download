@@ -15,6 +15,7 @@ const origin = (() => { try { return new URL(url).origin; } catch { return null;
 // Name Chrome determined for a detected download (real name even for page-made blob: downloads).
 const askedName = (() => { const n = params.get("name") || ""; return n && !n.startsWith("file from") && n !== "download" ? n : ""; })();
 const $ = (id) => document.getElementById(id);
+if (params.get("w") === "1") document.body.classList.add("compact");   // opened as the compact window
 const ICON = (name) => `<svg class="icon"><use href="icons.svg#${name}"/></svg>`;
 
 // ---------- status area: one place for progress, errors and success ----------
@@ -109,6 +110,24 @@ $("eye").onclick = () => {
   $("eye").textContent = show ? "Hide" : "Show"; $("eye").setAttribute("aria-pressed", String(show));
 };
 
+// ---------- suggest a strong password: 4 random words + a number (about 52 bits) ----------
+function suggestPassword() {
+  const r = new Uint32Array(5); crypto.getRandomValues(r);
+  const words = [0, 1, 2, 3].map((i) => WORDS[r[i] % WORDS.length]);
+  return words.join("-") + "-" + (10 + (r[4] % 90));
+}
+$("suggest").onclick = () => {
+  const p = suggestPassword();
+  $("pw").value = $("pw2").value = p;
+  $("pw").type = $("pw2").type = "text"; $("eye").textContent = "Hide"; $("eye").setAttribute("aria-pressed", "true");
+  acceptedWeak = null; $("pwWarn").hidden = true; refreshPw();
+  $("suggestBox").hidden = false; $("copyPw").textContent = "Copy";
+};
+$("copyPw").onclick = async () => {
+  try { await navigator.clipboard.writeText($("pw").value); $("copyPw").textContent = "Copied"; }
+  catch { $("pw").select(); $("copyPw").textContent = "Press ⌘C to copy"; }
+};
+
 // ---------- getting the file ----------
 // Runs INSIDE the source tab, so the request carries that page's cookies, origin and
 // bot-check clearance, like the browser's own download would. Allowed by activeTab
@@ -185,7 +204,17 @@ function succeed(saved, extra = "") {
   setStatus("ok", "Saved " + saved, "It's in your Downloads folder." + (extra ? " " + extra : ""));
   $("done").hidden = false; $("showFolder").hidden = savedId === null; $("doneBtn").focus();
   chrome.runtime.sendMessage({ type: "handled" }).catch(() => {});
+  maybeAskForReview();
 }
+// After the 5th locked file, ask once (never again after it has been shown).
+async function maybeAskForReview() {
+  const { lockCount = 0, reviewAsked = false } = await chrome.storage.local.get(["lockCount", "reviewAsked"]);
+  const n = lockCount + 1;
+  await chrome.storage.local.set({ lockCount: n });
+  if (n >= 5 && !reviewAsked) { $("rate").hidden = false; await chrome.storage.local.set({ reviewAsked: true }); }
+}
+$("rateNo").onclick = () => { $("rate").hidden = true; };
+$("rateLink").onclick = () => { setTimeout(() => { $("rate").hidden = true; }, 300); };
 function fail(message) {
   setStatus("error", "Nothing was saved", message.replace(/\s*(Nothing was saved\.|It was not saved\.)\s*$/, ""));
 }

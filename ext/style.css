@@ -154,3 +154,32 @@ body.popup { width: 340px; background: var(--surface); font-size: 14px; line-hei
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 #neverRow { margin: 0; } #neverRow .quiet { margin-top: var(--s3); }
+
+/* 1.5: password suggestion, review prompt, compact window */
+.linkbtn { background: none; border: 0; padding: 0; font: 500 13px var(--font); color: var(--blue); cursor: pointer; }
+.linkbtn.muted { color: var(--slate); }
+.sugrow { margin: var(--s2) 0 0; }
+.suggest { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); margin-top: var(--s2);
+  padding: 10px var(--s3); border: 1px dashed var(--tint); border-radius: var(--r-sm); }
+.suggest .hint { margin: 0; }
+.btn.small { height: 32px; padding: 0 var(--s3); font-size: 13px; }
+.rate { margin-top: var(--s4); padding: var(--s3) var(--s4); border: 1px solid var(--line); border-radius: var(--r-md);
+  display: flex; justify-content: space-between; align-items: center; gap: var(--s3); font-size: 14px; line-height: 20px; flex-wrap: wrap; }
+.rate-actions { display: flex; gap: var(--s4); white-space: nowrap; }
+body.compact .page { margin: 20px auto 16px; padding: 0 var(--s5); }
+body.compact .brand { display: none; }
+body.compact h1 { font-size: 20px; line-height: 26px; }
+body.compact .lede { font-size: 14px; line-height: 20px; margin-bottom: var(--s4); }
+body.compact .envelope { margin-bottom: var(--s4); }
+body.compact .field { margin-bottom: var(--s3); }
+body.compact .actions { margin-top: var(--s3); }
+body.compact .foot { margin-top: var(--s6); }
+/* welcome */
+.steps { counter-reset: s; display: grid; gap: var(--s5); margin: 0 0 var(--s6); padding: 0; list-style: none; }
+.steps > li { display: grid; grid-template-columns: 28px 1fr; gap: var(--s3); }
+.steps > li::before { counter-increment: s; content: counter(s); width: 28px; height: 28px; border-radius: 50%; background: var(--blue);
+  color: var(--on-blue); display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 14px; }
+.steps h3 { font-size: 15px; line-height: 22px; margin: 2px 0 var(--s2); font-weight: 600; }
+.steps .hint { margin: 0 0 10px; }
+.done-chip { display: inline-flex; gap: 6px; align-items: center; color: var(--green); font-weight: 500; font-size: 13px; }
+.done-chip .icon { width: 16px; height: 16px; }

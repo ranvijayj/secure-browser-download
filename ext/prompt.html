@@ -35,6 +35,9 @@
       <div class="input"><input type="password" id="pw" autofocus autocomplete="new-password" aria-describedby="meterWord">
         <button type="button" id="eye" class="toggle" aria-pressed="false">Show</button></div>
       <div class="meter" id="meter" data-level="0"><div class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i></div><span class="word" id="meterWord">At least 8 characters</span></div>
+      <p class="sugrow"><button type="button" class="linkbtn" id="suggest">Suggest a strong password</button></p>
+      <div class="suggest" id="suggestBox" hidden><span class="hint">Save this in your password manager. It can't be recovered.</span>
+        <button type="button" class="btn secondary small" id="copyPw">Copy</button></div>
     </div>
     <div class="field">
       <label for="pw2">Confirm password</label>
@@ -76,9 +79,14 @@
     </div>
   </div>
 
+  <div class="rate" id="rate" hidden><span>Finding SecureDL useful? A rating helps others find it.</span>
+    <span class="rate-actions"><a href="https://chromewebstore.google.com/detail/olcbfjjoidcpkkadibkgpkpacmmahpga/reviews" target="_blank" id="rateLink">Rate SecureDL</a>
+    <button type="button" class="linkbtn muted" id="rateNo">No thanks</button></span></div>
+
   <p class="foot fine" id="footNote">If you forget this password, the file can't be opened. Everything happens on this computer; nothing is uploaded.</p>
 </main>
 <script src="lib/pdf-lib.min.js"></script>
 <script src="crypto.js"></script>
+<script src="wordlist.js"></script>
 <script src="prompt.js"></script>
 </body></html>

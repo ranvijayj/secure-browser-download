@@ -30,13 +30,15 @@ FEATURES
 • "Recent downloads" shows what happened to each download and why
 • Right-click any link, image or video → Download with password
 • Lock a file that's already on your computer
+• "Suggest a strong password": one click for a memorable four-word passphrase, with a Copy button
+• A short welcome page on install sets everything up in under a minute
 • Uses the page you're on to fetch the file, so downloads from sites you're signed in to still work
 
 CHECKED BEFORE SAVING
 • Every locked file is test-opened with your password and compared with the original before it's saved
 • Refuses bot-check, login and error pages, so you never get a locked junk file
 • Refuses programs disguised as documents (e.g. an .exe named invoice.pdf)
-• Password confirmation and weak-password warnings
+• Password confirmation, a strength meter and weak-password warnings
 • Never overwrites an existing file
 
 PRIVACY

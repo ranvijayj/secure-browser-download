@@ -59,6 +59,8 @@ Try it: `samples/` has one of each. The password is `test1234`.
   Why stop instead of pause? Chrome holds a download for an extension for only about 10 seconds, then saves it anyway. That's too short to type a password.
   Downloads a page builds itself (`blob:` downloads) are handled too. If the file can't be fetched again (single-use links, files the page already discarded), choose **Download it normally, then lock it**. It's let through once; when it finishes you pick it, it's locked, and the unprotected copy is deleted.
   **Recent downloads** in the popup and Settings shows what SecureDL did with each download and why. Check it first if something wasn't intercepted.
+- **First run:** a welcome page lets you choose a mode, give access and try it on a sample PDF.
+- **Suggest a strong password** fills a four-word passphrase (from the EFF word list) with a Copy button.
 - **Right-click** any link, image or video → **Download with password**.
 - **Toolbar icon → Lock a file on this computer.** This opens in a tab, because on macOS a file dialog would close the toolbar popup.
 

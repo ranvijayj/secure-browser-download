@@ -25,3 +25,7 @@ SOFTWARE.
 
 ----
 SecureDL bundles IBM Plex Sans (ext/fonts/), licensed under the SIL Open Font License 1.1 — see ext/fonts/OFL-IBM-Plex.txt
+
+----
+ext/wordlist.js contains words from the EFF Large Wordlist for passphrases (https://www.eff.org/dice),
+by the Electronic Frontier Foundation, licensed under CC BY 3.0 US (https://creativecommons.org/licenses/by/3.0/us/).

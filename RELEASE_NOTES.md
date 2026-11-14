@@ -3,13 +3,19 @@
 **Most people should install from the [Chrome Web Store](https://chromewebstore.google.com/detail/olcbfjjoidcpkkadibkgpkpacmmahpga)**, which updates automatically.
 
 ## Install unpacked (power users)
-1. Download **SecureDL-v1.4.1.zip** below and unzip it.
+1. Download **SecureDL-v1.5.0.zip** below and unzip it.
 2. Open `chrome://extensions` and turn on **Developer mode** (top right).
-3. Click **Load unpacked** and select the unzipped **SecureDL-v1.4.1** folder (the one that contains `manifest.json`).
+3. Click **Load unpacked** and select the unzipped **SecureDL-v1.5.0** folder (the one that contains `manifest.json`).
 4. Pin SecureDL from the puzzle-piece menu.
 5. Optional: click the SecureDL icon → **Ask for documents** to have downloads stopped automatically. Chrome then asks once for access.
 
 To update, unzip the new version over the old folder and click ↻ on the SecureDL card in `chrome://extensions`.
+
+## What's in 1.5.0
+- **Welcome page on install.** Choose when SecureDL should step in, give access in one click, and try it on a sample PDF.
+- **Suggest a strong password.** One click fills a four-word passphrase you can copy into your password manager.
+- **The password box opens in a small window** instead of a full tab, so the page you were on stays put.
+- After your fifth locked file, SecureDL asks once whether you'd rate it. It never asks again.
 
 ## What's in 1.4.1
 - **Opening a locked file is clearer and safer.** A `.locked.html` file now opens for viewing in the page: images, PDFs and text are shown right there. An unlocked copy is saved only when you click **Save an unlocked copy**, with a reminder that it has no password. Before, unlocking saved an unprotected copy automatically.
