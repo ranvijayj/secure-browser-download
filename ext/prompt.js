@@ -50,7 +50,7 @@ if (ask) {
   $("title").textContent = "Lock this download?";
   $("lede").textContent = "SecureDL stopped this download. Choose a password to save a locked copy, or save it without one.";
   badge("", "Stopped, nothing saved yet", "stop");
-  $("skip").hidden = false; $("neverRow").hidden = !site; $("neverSite").textContent = site;
+  $("skip").hidden = false; $("neverRow").hidden = !site || /\/samples\/try-securedl\.pdf$/.test(url); $("neverSite").textContent = site;
 }
 if (pickMode) {
   document.title = "SecureDL – Lock the downloaded file";

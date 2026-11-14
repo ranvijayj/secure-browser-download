@@ -3,13 +3,17 @@
 **Most people should install from the [Chrome Web Store](https://chromewebstore.google.com/detail/olcbfjjoidcpkkadibkgpkpacmmahpga)**, which updates automatically.
 
 ## Install unpacked (power users)
-1. Download **SecureDL-v1.5.1.zip** below and unzip it.
+1. Download **SecureDL-v1.5.2.zip** below and unzip it.
 2. Open `chrome://extensions` and turn on **Developer mode** (top right).
-3. Click **Load unpacked** and select the unzipped **SecureDL-v1.5.1** folder (the one that contains `manifest.json`).
+3. Click **Load unpacked** and select the unzipped **SecureDL-v1.5.2** folder (the one that contains `manifest.json`).
 4. Pin SecureDL from the puzzle-piece menu.
 5. Optional: click the SecureDL icon → **Ask for documents** to have downloads stopped automatically. Chrome then asks once for access.
 
 To update, unzip the new version over the old folder and click ↻ on the SecureDL card in `chrome://extensions`.
+
+## What's in 1.5.2
+- The welcome page says clearly that everything stays on your computer.
+- The option to stop asking for a site is now called "Never ask for downloads from …". It's hidden for the welcome sample.
 
 ## What's in 1.5.1
 - The password box opens in a tab again, as before 1.5.0. A separate window added friction.

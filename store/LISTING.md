@@ -25,7 +25,7 @@ HOW IT OPENS (no app to install)
 
 FEATURES
 • Automatic detection: asks when documents & images (or every file) start downloading
-• "Always save from this site without asking" for sites you trust
+• "Never ask for downloads from" sites you trust
 • Works with downloads that pages build themselves, too
 • "Recent downloads" shows what happened to each download and why
 • Right-click any link, image or video → Download with password

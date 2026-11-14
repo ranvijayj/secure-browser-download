@@ -1,6 +1,6 @@
 {
   "name": "securedl",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "description": "Chrome extension: save downloads password-protected, 100% locally.",
   "scripts": {
     "test": "node test/test.mjs && node test/e2e.mjs",
