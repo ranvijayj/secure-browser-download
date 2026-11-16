@@ -3,16 +3,13 @@
 **Most people should install from the [Chrome Web Store](https://chromewebstore.google.com/detail/olcbfjjoidcpkkadibkgpkpacmmahpga)**, which updates automatically.
 
 ## Install unpacked (power users)
-1. Download **SecureDL-v1.5.4.zip** below and unzip it.
+1. Download **SecureDL-v1.5.3.zip** below and unzip it.
 2. Open `chrome://extensions` and turn on **Developer mode** (top right).
-3. Click **Load unpacked** and select the unzipped **SecureDL-v1.5.4** folder (the one that contains `manifest.json`).
+3. Click **Load unpacked** and select the unzipped **SecureDL-v1.5.3** folder (the one that contains `manifest.json`).
 4. Pin SecureDL from the puzzle-piece menu.
 5. Optional: click the SecureDL icon → **Ask for documents** to have downloads stopped automatically. Chrome then asks once for access.
 
 To update, unzip the new version over the old folder and click ↻ on the SecureDL card in `chrome://extensions`.
-
-## What's in 1.5.4
-- The welcome page highlights **Give access** until it's clicked. If Chrome's access prompt is denied, the page now says what that means and lets you try again.
 
 ## What's in 1.5.3
 - The welcome page is now two columns and fits on screen without scrolling.

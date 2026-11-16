@@ -417,16 +417,6 @@ await ctx.close();
 
   // Bug repro: choosing a detection mode in the popup must be saved even though Chrome's access
   // dialog is still open (on macOS that dialog closes the popup).
-  // Welcome page: closing Chrome's access prompt without allowing explains what happens next.
-  const wl = await c2.newPage(); await wl.goto(`chrome-extension://${id2}/welcome.html`);
-  await wl.click('input[name="mode"][value="ask-docs"]');
-  ok(await wl.$eval("#grant", (e) => !e.hidden && e.classList.contains("nudge")), "welcome: 'Give access' is highlighted once a mode needs access");
-  await wl.evaluate(() => { chrome.permissions.request = async () => false; });
-  await wl.click("#grant");
-  ok(await wl.$eval("#denied", (e) => !e.hidden) && await wl.$eval("#grant", (e) => !e.hidden), "welcome: if access is denied, it says so and keeps 'Give access' for a retry");
-  await wl.click('input[name="mode"][value="off"]');
-  ok(await wl.$eval("#denied", (e) => e.hidden), "welcome: choosing Do nothing clears the denied note");
-  await wl.close();
   const pop = await c2.newPage(); await pop.goto(`chrome-extension://${id2}/popup.html`);
   const optP = c2.waitForEvent("page", { predicate: (pg) => pg.url().includes("options.html"), timeout: 8000 }).catch(() => null);
   await pop.click('input[name="mode"][value="ask-all"]');
