@@ -197,3 +197,9 @@ body.compact .foot { margin-top: var(--s6); }
 .welcome .fine { margin: var(--s2) 0 0; }
 .welcome > .fine { margin-top: var(--s4); }
 @media (max-width: 720px) { .welcome .steps { grid-template-columns: 1fr; } .welcome .steps > li:first-child { grid-row: auto; } }
+
+/* Draw the eye to the next step; one soft pulse ring, off for reduced motion */
+.btn.nudge { animation: nudge 1.8s ease-out 3; }
+@keyframes nudge { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--blue) 55%, transparent); } 70%, 100% { box-shadow: 0 0 0 10px transparent; } }
+@media (prefers-reduced-motion: reduce) { .btn.nudge { animation: none; } }
+.denied { color: var(--ink); margin-top: 10px; }
