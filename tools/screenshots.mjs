@@ -22,7 +22,7 @@ const askUrl = `chrome-extension://${id}/prompt.html?` + new URLSearchParams({ u
   ask: "1", name: "Statement-2026-10.pdf", site: "mybank.example" });
 const hideChrome = (p) => p.evaluate(() => { document.querySelector(".brand").hidden = true; document.querySelector(".foot").hidden = true;
   document.querySelector(".page").style.margin = "28px auto 8px"; });
-const ask = await capture(askUrl, 520, 600, async (p) => {
+const ask = await capture(askUrl, 520, 650, async (p) => {
   await hideChrome(p);
   for (const s of ["#pw", "#pw2"]) { await p.fill(s, "correct horse battery"); await p.dispatchEvent(s, "input"); }
 });
