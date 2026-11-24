@@ -4,7 +4,8 @@
 <link rel="icon" href="icons/32.png">
 <link rel="stylesheet" href="style.css"></head>
 <body>
-<main class="page">
+<main class="page twocol">
+<div class="col-left">
   <div class="brand"><img src="icons/48.png" alt="">SecureDL</div>
   <h1 id="title">Download with password</h1>
   <p class="lede" id="lede">Choose a password. Only the locked copy is saved.</p>
@@ -29,6 +30,10 @@
     <span class="chosen" id="localChosen">No file chosen</span>
   </div>
 
+  <p class="foot fine" id="footNote">If you forget this password, the file can't be opened. Everything happens on this computer; nothing is uploaded.</p>
+</div>
+
+<div class="col-right">
   <div id="form">
     <div class="field">
       <label for="pw">Password</label>
@@ -83,10 +88,11 @@
     <span class="rate-actions"><a href="https://chromewebstore.google.com/detail/olcbfjjoidcpkkadibkgpkpacmmahpga/reviews" target="_blank" id="rateLink">Rate SecureDL</a>
     <button type="button" class="linkbtn muted" id="rateNo">No thanks</button></span></div>
 
-  <p class="foot fine" id="footNote">If you forget this password, the file can't be opened. Everything happens on this computer; nothing is uploaded.</p>
+</div>
 </main>
 <script src="lib/pdf-lib.min.js"></script>
 <script src="crypto.js"></script>
 <script src="wordlist.js"></script>
+<script src="held.js"></script>
 <script src="prompt.js"></script>
 </body></html>

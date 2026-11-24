@@ -155,7 +155,7 @@ body.popup { width: 340px; background: var(--surface); font-size: 14px; line-hei
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 #neverRow { margin: 0; } #neverRow .quiet { margin-top: var(--s3); }
 
-/* 1.5: password suggestion, review prompt, compact window */
+/* 1.5: password suggestion, review prompt */
 .linkbtn { background: none; border: 0; padding: 0; font: 500 13px var(--font); color: var(--blue); cursor: pointer; }
 .linkbtn.muted { color: var(--slate); }
 .sugrow { margin: var(--s2) 0 0; }
@@ -166,14 +166,6 @@ body.popup { width: 340px; background: var(--surface); font-size: 14px; line-hei
 .rate { margin-top: var(--s4); padding: var(--s3) var(--s4); border: 1px solid var(--line); border-radius: var(--r-md);
   display: flex; justify-content: space-between; align-items: center; gap: var(--s3); font-size: 14px; line-height: 20px; flex-wrap: wrap; }
 .rate-actions { display: flex; gap: var(--s4); white-space: nowrap; }
-body.compact .page { margin: 20px auto 16px; padding: 0 var(--s5); }
-body.compact .brand { display: none; }
-body.compact h1 { font-size: 20px; line-height: 26px; }
-body.compact .lede { font-size: 14px; line-height: 20px; margin-bottom: var(--s4); }
-body.compact .envelope { margin-bottom: var(--s4); }
-body.compact .field { margin-bottom: var(--s3); }
-body.compact .actions { margin-top: var(--s3); }
-body.compact .foot { margin-top: var(--s6); }
 /* welcome */
 .steps { counter-reset: s; display: grid; gap: var(--s5); margin: 0 0 var(--s6); padding: 0; list-style: none; }
 .steps > li { display: grid; grid-template-columns: 28px 1fr; gap: var(--s3); }
@@ -197,3 +189,10 @@ body.compact .foot { margin-top: var(--s6); }
 .welcome .fine { margin: var(--s2) 0 0; }
 .welcome > .fine { margin-top: var(--s4); }
 @media (max-width: 720px) { .welcome .steps { grid-template-columns: 1fr; } .welcome .steps > li:first-child { grid-row: auto; } }
+
+/* Lock page: two columns (the file on the left, the choices on the right) so it fits one screen */
+.page.twocol { max-width: 900px; margin: 40px auto 32px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); column-gap: var(--s10); align-items: start; }
+.twocol .col-right { padding-top: 42px; }          /* lines the form up with the heading */
+.twocol .col-left .foot { margin-top: var(--s8); }
+.twocol .col-right > :last-child { margin-bottom: 0; }
+@media (max-width: 760px) { .page.twocol { max-width: 460px; grid-template-columns: 1fr; } .twocol .col-left, .twocol .col-right { display: contents; } .twocol .foot { order: 99; margin: var(--s6) 0 0; } }

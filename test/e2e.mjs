@@ -16,6 +16,7 @@ const CHALLENGE = `<!DOCTYPE html><html><head><title>Just a moment...</title></h
 <script src="/cdn-cgi/challenge-platform/h/b/orchestrate/chl_page/v1"></script></body></html>`;
 
 const log = [];
+let onceHits = 0;
 const server = http.createServer((req, res) => {
   const cleared = /clear=1/.test(req.headers.cookie || "");
   // Real bot checks treat requests that don't look like the site's own traffic as suspicious.
@@ -35,9 +36,19 @@ const server = http.createServer((req, res) => {
     return res.end(["slow-statement.pdf", "slow-report.pdf", "setup.dmg", "tiny.pdf", "fake-invoice.pdf", "slow-other.pdf"]
       .map((f) => `<a id="${f.split(".")[0]}" href="/dl/${f}" download>${f}</a>`).join("<br>") + '<br><a id="fast2mb" href="/file-download/152">Download</a>');
   }
+  if (req.url === "/once.pdf") {                      // a file the site hands over exactly once
+    onceHits++;
+    if (onceHits > 1) { res.writeHead(410); return res.end("gone"); }
+    res.writeHead(200, { "content-type": "application/pdf", "content-length": PDF.length }); return res.end(PDF);
+  }
   if (req.url === "/blobs") {
     res.writeHead(200, { "content-type": "text/html" });
-    return res.end(`<button id="keep">keep</button><button id="revoke">revoke</button><script>
+    return res.end(`<button id="keep">keep</button><button id="revoke">revoke</button><button id="late">late</button><script>
+      late.onclick = () => {                           // like a cloud console's one-time key download
+        const u = URL.createObjectURL(new Blob(['{"type":"service_account","private_key":"SECRET-ONE-TIME-KEY"}'], { type: "application/json" }));
+        const a = document.createElement("a"); a.href = u; a.download = "one-time-key.json"; a.click();
+        setTimeout(() => URL.revokeObjectURL(u), 300);
+      };
       function make(revoke) {
         const u = URL.createObjectURL(new Blob(["%PDF-1.4 statement from the page"], { type: "text/plain" }));
         const a = document.createElement("a"); a.href = u; a.download = revoke ? "page-made-revoked.txt" : "page-made.txt"; a.click();
@@ -230,6 +241,9 @@ if (ask) {
 // C. installer is ignored in documents-only mode
 tabP = askTab(); await dlPage.click("#setup");
 ok(!(await tabP) && await waitFile("setup.dmg"), "documents-only mode ignores a .dmg installer (saved normally)");
+const logNow = async () => (await sw.evaluate(() => chrome.storage.local.get("log"))).log || [];
+const sawNotDocument = (await logNow()).some((e) => e.decision.includes("not a document"));
+let sawLetThrough = false;
 // D. instant tiny file -> nothing lands while the form is unfilled
 tabP = askTab(); await dlPage.click("#tiny");
 ask = await tabP;
@@ -315,25 +329,20 @@ if (ask) {
   const left = (await blobState("page-made.txt")).filter((d) => d.file && fs.existsSync(d.file));
   ok(left.length === 0, "no unprotected page-made file left on disk");
 }
-// J. Page-made download whose blob is already revoked -> "download it normally, then lock it"
+// J. Page-made download whose blob is revoked at once -> can't be read first, so it is let
+//    through (never thrown away); a "Lock the downloaded file" page then opens
+const heldCount = () => sw.evaluate(async () => { const db = await heldOpen();
+  const n = await new Promise((r) => { const q = db.transaction("files").objectStore("files").count(); q.onsuccess = () => r(q.result); }); db.close(); return n; });
 await sw.evaluate(() => chrome.downloads.erase({}));
-tabP = askTab(); await blobPage.click("#revoke");
-ask = await tabP;
-if (ask) {
-  await ask.waitForLoadState(); await new Promise((r) => setTimeout(r, 600));
-  await ask.fill("#pw", "tangerine-kayak-41"); await ask.fill("#pw2", "tangerine-kayak-41"); await ask.click("#go");
-  await ask.waitForFunction(() => ["ok","error"].includes(document.getElementById("status").dataset.state), null, { timeout: 20000 });
-  ok(await ask.$eval("#pick", (e) => !e.hidden), "revoked page-made file can't be fetched: offers 'download it normally, then lock it'");
-  await ask.click("#pickStart");
-  await ask.waitForFunction(() => /click the download button/i.test(document.getElementById("pickHint").textContent), null, { timeout: 5000 });
-  ok(true, "tells the user to click the site's download button again");
-  const lockP = ctx.waitForEvent("page", { predicate: (pg) => pg.url().includes("pick=1"), timeout: 10000 }).catch(() => null);
-  await blobPage.click("#revoke");                              // user clicks again; this one is let through
+{
+  const lockP = ctx.waitForEvent("page", { predicate: (pg) => pg.url().includes("pick=1"), timeout: 15000 }).catch(() => null);
+  await blobPage.click("#revoke");
   const lockPage = await lockP;
-  ok(!!lockPage && inDir("page-made-revoked.txt"), "let-through download finished and a 'Lock the downloaded file' page opened");
+  ok(!!lockPage && await waitFile("page-made-revoked.txt", 8000), "unreadable page-made file is let through and a 'Lock the downloaded file' page opens");
   if (lockPage) {
     await lockPage.waitForLoadState();
     await lockPage.waitForFunction(() => !document.getElementById("pickFileWrap").hidden, null, { timeout: 5000 });
+    ok(/couldn.t read this file before it saved/i.test(await lockPage.$eval("#pickHint", (e) => e.textContent)), "the page explains why it was let through");
     const since = await lastId();
     await lockPage.fill("#pw", "tangerine-kayak-41"); await lockPage.fill("#pw2", "tangerine-kayak-41");
     await lockPage.setInputFiles("#pickFile", path.join(dlDir, "page-made-revoked.txt"));
@@ -344,8 +353,45 @@ if (ask) {
     ok(st.includes("✅") && path.basename(saved[0] || "") === "page-made-revoked.txt.locked.html" && !inDir("page-made-revoked.txt"),
       "picked file locked and the unprotected copy deleted: " + st.trim());
   }
-  if (!ask.isClosed()) await ask.close();
-} else ok(false, "ask tab for revoked page-made download");
+}
+// P. One-time page-made file (a service-account key): the blob is gone 300 ms after the click.
+//    SecureDL must already hold it, so BOTH choices still work seconds later.
+await sw.evaluate(() => chrome.downloads.erase({}));
+tabP = askTab(); await blobPage.click("#late");
+ask = await tabP;
+ok(!!ask, "one-time page-made file: ask tab opens");
+if (ask) {
+  await ask.waitForLoadState(); await new Promise((r) => setTimeout(r, 1500));   // blob is long gone now
+  ok(await heldCount() >= 1, "the file is held by SecureDL while you choose");
+  await ask.click("#skip");
+  ok(await waitFile("one-time-key.json", 8000), "Save without a password still saves the one-time file");
+  const body = inDir("one-time-key.json") ? fs.readFileSync(path.join(dlDir, "one-time-key.json"), "utf8") : "";
+  ok(body.includes("SECRET-ONE-TIME-KEY"), "the saved one-time file has its full contents");
+}
+await sw.evaluate(() => chrome.downloads.erase({}));
+tabP = askTab(); await blobPage.click("#late");
+ask = await tabP;
+if (ask) {
+  await ask.waitForLoadState(); await new Promise((r) => setTimeout(r, 1500));
+  const r = await lockIn(ask);
+  ok(r.status.includes("✅") && /one-time-key\.json.*\.locked\.html$/.test(path.basename(r.saved[0] || "")), "Lock and save works for the one-time file: " + path.basename(r.saved[0] || "-"));
+  await new Promise((r2) => setTimeout(r2, 600));
+  ok(await heldCount() === 0, "the held copy is deleted once the file is saved");
+}
+// Q. A link the site serves only once: SecureDL's own read fails, so the download goes through
+onceHits = 0;
+await sw.evaluate(() => chrome.downloads.erase({}));
+{
+  const dl = await ctx.newPage(); await dl.goto(base + "/downloads");
+  const lockP = ctx.waitForEvent("page", { predicate: (pg) => pg.url().includes("pick=1"), timeout: 15000 }).catch(() => null);
+  await dl.evaluate(() => { const a = document.createElement("a"); a.href = "/once.pdf"; a.download = "once.pdf"; document.body.append(a); a.click(); });
+  const lp = await lockP;
+  ok(!!lp && await waitFile("once.pdf", 8000), "a once-only link is saved, not lost, and a lock page opens");
+  const first = inDir("once.pdf") ? fs.statSync(path.join(dlDir, "once.pdf")).size : 0;
+  ok(first === PDF.length, "the once-only file is complete on disk");
+  sawLetThrough = (await logNow()).some((e) => e.decision.includes("couldn't read it first"));
+  await dl.close(); if (lp && !lp.isClosed()) await lp.close();
+}
 // N. Page-made download -> Save normally (fetched from the page, saved as-is)
 await sw.evaluate(() => chrome.downloads.erase({}));
 tabP = askTab(); await blobPage.click("#keep");
@@ -369,8 +415,10 @@ if (ask) {
 } else ok(false, "ask tab for 'always save normally'");
 // L. Activity log explains decisions
 const { log: actLog } = await sw.evaluate(() => chrome.storage.local.get("log"));
-ok(actLog.some((e) => e.decision.includes("not a document")) && actLog.some((e) => e.decision.includes("always save normally")) &&
-   actLog.some((e) => e.decision.startsWith("stopped and asked")), "activity log records why each download was or wasn't intercepted");
+ok(actLog.some((e) => e.decision.includes("always save normally")) && actLog.some((e) => e.decision.startsWith("stopped and asked")),
+   "activity log records why each download was or wasn't intercepted");
+ok(sawNotDocument, "activity log said an installer was skipped because it isn't a document");
+ok(actLog.some((e) => e.decision.includes("couldn't read it first")) || sawLetThrough, "activity log says when a once-only file was let through");
 await setMode("off", []);
 
 // M. v1.5: welcome tab, suggested password, review prompt, compact window
@@ -390,6 +438,19 @@ ok(ctx.pages().some((pg) => pg.url().endsWith("/welcome.html")), "welcome tab op
   const st = await sw.evaluate(() => chrome.storage.local.get(["lockCount", "reviewAsked"]));
   ok(st.reviewAsked === true, "review prompt is only shown once");
   if (!p.isClosed()) await p.close();
+}
+
+// R. 1.5.5: lock page fits one screen (two columns); nothing is left in the temporary store
+{
+  const lp = await ctx.newPage(); await lp.setViewportSize({ width: 1280, height: 720 });
+  await lp.goto(`chrome-extension://${extId}/prompt.html?` + new URLSearchParams({ url: base + "/protected.pdf", ask: "1", name: "key.json", site: "console.cloud.google.com" }));
+  await lp.click("#suggest"); await new Promise((r) => setTimeout(r, 300));
+  const m = await lp.evaluate(() => ({ sh: document.documentElement.scrollHeight, ih: innerHeight,
+    left: document.querySelector(".col-left").getBoundingClientRect().left, right: document.querySelector(".col-right").getBoundingClientRect().left }));
+  ok(m.sh <= m.ih && m.right > m.left + 200, `lock page is two columns and needs no scrolling at 1280x720 (${m.sh} <= ${m.ih})`);
+  await lp.close();
+  await new Promise((r) => setTimeout(r, 500));
+  ok(await heldCount() === 0, "no held files are left in storage after the tests");
 }
 
 await ctx.close();

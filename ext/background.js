@@ -4,20 +4,20 @@
 //   "off"      – right-click only (default)
 //   "ask-docs" – when a document/image/archive download starts, stop it and ask
 //   "ask-all"  – stop and ask for every download
-// A detected download is CANCELLED immediately (Chrome deletes its partial file) and
-// prompt.html opens in "ask" mode. Chrome gives extensions only ~10 s to hold a download, far
-// too short to type a password, so stopping it is the only way to keep the unprotected file off
-// the disk. "Encrypt & save" re-fetches and saves only the locked copy; "Save normally" restarts
-// the download; if the file can't be fetched again, it is let through once and the user locks
-// the downloaded copy (which is then deleted).
+// A detected download is read FIRST (inside the page it came from, so cookies and bot-check
+// clearance apply), then CANCELLED (Chrome deletes its partial file) and prompt.html opens in
+// "ask" mode. Chrome gives extensions only ~10 s to hold a download, far too short to type a
+// password, so SecureDL keeps its own copy until you choose. Rule: never cancel a download
+// unless that copy is safely held. If the file can't be read in time (some sites hand a file
+// over only once), the download is let through instead and you're asked to lock the saved file.
 //
 // Every decision is written to a small activity log (shown in the popup) so it is always
 // visible WHY a download was or wasn't intercepted.
 
-// The lock page opens as a compact window over the page you were on (a quick question, not a
-// new page). Returns its tab, so callers can track it like before.
+importScripts("crypto.js", "held.js");   // checkDownload() and the temporary file store
+
+// The lock page opens as a normal tab next to the page you were on. Returns its tab.
 async function PROMPT(params) {
-  // Opens next to the page the download came from, as a normal tab (a separate window felt like more friction).
   return chrome.tabs.create({ url: "prompt.html?" + new URLSearchParams(params).toString(), active: true });
 }
 const ALL = { origins: ["<all_urls>"] };
@@ -135,6 +135,40 @@ async function addLockWhenDone(id) {
   await chrome.storage.session.set({ lockWhenDone: [...lockWhenDone, id] });
 }
 
+// ---------- Reading the file before stopping the download ----------
+const HOLD_MS = 4500;                 // Chrome waits ~10 s for us; leave room to cancel and answer
+const MAX_HOLD = 50 * 1024 * 1024;    // larger files are let through, then locked from disk
+// Runs INSIDE the source tab (serialised, so it must be self-contained).
+async function readInPage(url, max) {
+  try {
+    const r = await fetch(url, { credentials: "include" });
+    const b = await r.blob();
+    if (b.size > max) return { tooLarge: true };
+    const dataUrl = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(b); });
+    return { ok: r.ok, status: r.status, type: r.headers.get("content-type"), cd: r.headers.get("content-disposition"), finalUrl: r.url, dataUrl };
+  } catch (e) { return { error: String(e.message || e) }; }
+}
+async function holdFile(url, tab) {
+  if (!tab?.id) return { reason: "no tab to read it from" };
+  let timer;
+  try {
+    const read = chrome.scripting.executeScript({ target: { tabId: tab.id }, func: readInPage, args: [url, MAX_HOLD] })
+      .then(([res]) => res?.result, (e) => ({ error: String(e.message || e) }));
+    const r = await Promise.race([read, new Promise((res) => { timer = setTimeout(() => res({ error: "took too long" }), HOLD_MS); })]);
+    if (!r || r.error) return { reason: r?.error || "no answer from the page" };
+    if (r.tooLarge) return { reason: "too large to hold" };
+    const blob = await (await fetch(r.dataUrl)).blob();
+    const bad = (await checkDownload(blob, r.type, r.finalUrl || url)) || (!r.ok && { reason: "http", message: "HTTP " + r.status });
+    if (bad) return { reason: bad.message, kind: bad.reason };
+    const key = crypto.randomUUID();
+    await heldSweep(6 * 3600 * 1000).catch(() => {});
+    await heldPut(key, { blob, type: r.type, cd: r.cd, finalUrl: r.finalUrl });
+    return { key };
+  } catch (e) { return { reason: String(e.message || e) }; }
+  finally { clearTimeout(timer); }
+}
+chrome.runtime.onStartup.addListener(() => heldSweep(0).catch(() => {}));
+
 async function decide(item) {
   const url = item.finalUrl || item.url;
   if (restarts.has(item.url) || restarts.has(url)) {             // downloads we restarted (before the own check)
@@ -169,13 +203,24 @@ chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
     if (d.pass) { suggest(); if (d.pass.then === "lock") await addLockWhenDone(item.id); return; }
     if (!d.intercept) return suggest();
 
-    // Stop it NOW: cancelling deletes Chrome's partial file, so nothing unprotected is left.
+    // Read the file first. Only if we hold a copy do we stop the download; cancelling deletes
+    // Chrome's partial file, so nothing unprotected is left on the disk.
+    const tab = await sourceTab(item);
+    const held = await holdFile(d.url, tab);
+    // A program disguised as a document is stopped and refused (nothing to keep), as before.
+    if (!held.key && held.kind !== "disguised") {
+      // Can't read it (e.g. the site hands the file over only once). Never throw away the only
+      // copy: let it save, then offer to lock the saved file.
+      suggest();
+      await addLockWhenDone(item.id);
+      logDecision(item, "let through: couldn't read it first (" + held.reason + "). You'll be asked to lock it when it finishes");
+      return;
+    }
     await chrome.downloads.cancel(item.id).catch(() => {});
     suggest();
     chrome.downloads.erase({ id: item.id }).catch(() => {});
-    const tab = await sourceTab(item);
-    const t = await PROMPT({ url: d.url, tabId: tab?.id ?? "", ask: "1", name: displayName(item), site: d.site });
-    await chrome.storage.session.set({ ["pending:" + t.id]: { name: displayName(item), site: d.site } });
+    const t = await PROMPT({ url: d.url, tabId: tab?.id ?? "", ask: "1", name: displayName(item), site: d.site, ...(held.key ? { held: held.key } : {}) });
+    await chrome.storage.session.set({ ["pending:" + t.id]: { name: displayName(item), site: d.site, held: held.key || "" } });
     logDecision(item, "stopped and asked (nothing saved yet)");
   }).catch((e) => { console.error("SecureDL", e); suggest(); });
   return true;                                                   // we answer asynchronously
@@ -199,6 +244,7 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
   const { [key]: p } = await chrome.storage.session.get(key);
   if (!p) return;
   await chrome.storage.session.remove(key);
+  if (p.held) heldDelete(p.held).catch(() => {});
   logDecision({ filename: p.name, referrer: "https://" + p.site + "/" }, "closed without choosing: nothing was saved");
 });
 

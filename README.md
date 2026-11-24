@@ -57,7 +57,7 @@ Try it: `samples/` has one of each. The password is `test1234`.
   - **Close the tab:** nothing is saved.
 
   Why stop instead of pause? Chrome holds a download for an extension for only about 10 seconds, then saves it anyway. That's too short to type a password.
-  Downloads a page builds itself (`blob:` downloads) are handled too. If the file can't be fetched again (single-use links, files the page already discarded), choose **Download it normally, then lock it**. It's let through once; when it finishes you pick it, it's locked, and the unprotected copy is deleted.
+  Downloads a page builds itself (`blob:` downloads) are handled too. SecureDL reads the file first and only then stops the download, so one-time downloads (cloud service-account keys, recovery codes, single-use links) are never lost: both **Lock and save** and **Save without a password** work from the copy it holds. If it can't read a file in time, it lets the download save normally and then offers to lock the saved file (the unprotected copy is deleted once locked).
   **Recent downloads** in the popup and Settings shows what SecureDL did with each download and why. Check it first if something wasn't intercepted.
 - **First run:** a welcome page lets you choose a mode, give access and try it on a sample PDF.
 - **Suggest a strong password** fills a four-word passphrase (from the EFF word list) with a Copy button.
@@ -85,7 +85,7 @@ Try it: `samples/` has one of each. The password is `test1234`.
 - **Refuses junk.** If a site returns a bot-check, login, error or empty page instead of the file, nothing is saved.
 - **No recovery.** There is no backdoor and no password reset. Lose the password and the file is gone. Use a password manager.
 
-What it does **not** protect against: malware on your computer, or someone watching you type the password. The file is held in memory unencrypted while it's being encrypted. Encryption also adds no protection once you unlock and save the original somewhere. In automatic mode, Chrome may briefly write part of the file to a temporary `.crdownload` file before SecureDL stops the download. Stopping it deletes that file. **Save without a password** downloads the file a second time.
+What it does **not** protect against: malware on your computer, or someone watching you type the password. While you choose a password, a copy of the file is kept unencrypted in the extension's private browser storage on your computer (it is deleted as soon as you save or close the page, and swept at browser start). The file is also held in memory unencrypted while it's being encrypted. Encryption also adds no protection once you unlock and save the original somewhere. In automatic mode, Chrome may briefly write part of the file to a temporary `.crdownload` file before SecureDL stops the download. Stopping it deletes that file. **Save without a password** saves the copy SecureDL already holds.
 
 ## Limitations
 

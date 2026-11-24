@@ -3,13 +3,18 @@
 **Most people should install from the [Chrome Web Store](https://chromewebstore.google.com/detail/olcbfjjoidcpkkadibkgpkpacmmahpga)**, which updates automatically.
 
 ## Install unpacked (power users)
-1. Download **SecureDL-v1.5.3.zip** below and unzip it.
+1. Download **SecureDL-v1.5.5.zip** below and unzip it.
 2. Open `chrome://extensions` and turn on **Developer mode** (top right).
-3. Click **Load unpacked** and select the unzipped **SecureDL-v1.5.3** folder (the one that contains `manifest.json`).
+3. Click **Load unpacked** and select the unzipped **SecureDL-v1.5.5** folder (the one that contains `manifest.json`).
 4. Pin SecureDL from the puzzle-piece menu.
 5. Optional: click the SecureDL icon → **Ask for documents** to have downloads stopped automatically. Chrome then asks once for access.
 
 To update, unzip the new version over the old folder and click ↻ on the SecureDL card in `chrome://extensions`.
+
+## What's in 1.5.5
+- **One-time downloads are no longer lost.** Some sites hand over a file only once, such as a cloud service-account key or a recovery code. SecureDL now reads the file first and stops the download only once it holds a copy, so **Lock and save** and **Save without a password** both work. If it can't read a file in time, it lets the download save normally and then offers to lock the saved file.
+- The lock page is now two columns and fits on one screen without scrolling.
+- The held copy lives in the extension's private storage only while you choose, and is deleted when you finish.
 
 ## What's in 1.5.3
 - The welcome page is now two columns and fits on screen without scrolling.

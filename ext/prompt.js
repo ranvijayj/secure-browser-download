@@ -14,8 +14,12 @@ const site = params.get("site") || (() => { try { return new URL(url).host; } ca
 const origin = (() => { try { return new URL(url).origin; } catch { return null; } })();
 // Name Chrome determined for a detected download (real name even for page-made blob: downloads).
 const askedName = (() => { const n = params.get("name") || ""; return n && !n.startsWith("file from") && n !== "download" ? n : ""; })();
+// A detected download is read before it is stopped; the copy waits in extension storage (held.js).
+const heldKey = params.get("held") || "";
+let heldRec = null;
+const heldReady = heldKey ? heldGet(heldKey).then((r) => { heldRec = r || null; }, () => {}) : Promise.resolve();
+async function releaseHeld() { if (heldKey) { heldRec = null; await heldDelete(heldKey).catch(() => {}); } }
 const $ = (id) => document.getElementById(id);
-if (params.get("w") === "1") document.body.classList.add("compact");   // opened as the compact window
 const ICON = (name) => `<svg class="icon"><use href="icons.svg#${name}"/></svg>`;
 
 // ---------- status area: one place for progress, errors and success ----------
@@ -59,7 +63,7 @@ if (pickMode) {
   badge("warn", "Saved without a password", "alert");
   $("go").hidden = true; $("skip").hidden = true; $("neverRow").hidden = true;
   $("pick").hidden = false; $("pick").className = "callout info"; $("pickIntro").textContent = "Pick the downloaded file";
-  $("pickHint").textContent = "Until you lock it, the unprotected file is in your Downloads folder.";
+  $("pickHint").textContent = "SecureDL couldn't read this file before it saved, so it let the download through. Some sites give a file only once. Until you lock it, the unprotected file is in your Downloads folder.";
   $("pickStart").hidden = true;
   chrome.downloads.search({ id: dlId }).then(([d]) => {
     if (!d) return;
@@ -166,6 +170,8 @@ async function viaExtension() {
 
 // Try each way of getting the file; accept the first one that is really the file.
 async function getFile() {
+  await heldReady;
+  if (heldRec) return { ok: true, status: 200, type: heldRec.type, cd: heldRec.cd, finalUrl: heldRec.finalUrl, blob: heldRec.blob };
   const problems = [];
   for (const [label, attempt] of [["page", viaTab], ["extension", viaExtension]]) {
     if (label === "page" && !tabId) continue;
@@ -204,6 +210,7 @@ function succeed(saved, extra = "") {
   setStatus("ok", "Saved " + saved, "It's in your Downloads folder." + (extra ? " " + extra : ""));
   $("done").hidden = false; $("showFolder").hidden = savedId === null; $("doneBtn").focus();
   chrome.runtime.sendMessage({ type: "handled" }).catch(() => {});
+  releaseHeld();
   maybeAskForReview();
 }
 // After the 5th locked file, ask once (never again after it has been shown).
@@ -289,6 +296,15 @@ async function saveNormally(always) {
   busy(true);
   if (always) await rememberNeverAsk();
   const name = askedName || nameFromUrl(url);
+  await heldReady;
+  if (heldRec) {                                   // we hold the file: save it as-is, no second request
+    try {
+      await saveEncrypted({ blob: heldRec.blob, filename: askedName || nameFromUrl(heldRec.finalUrl || url, heldRec.cd) });
+      await releaseHeld();
+      setStatus("busy", always ? `Saving without a password. SecureDL won't ask again for ${site}.` : "Saving without a password.");
+      return closeSoon(always ? 1500 : 800);
+    } catch (e) { busy(false); return fail(e.message); }
+  }
   let r = await chrome.runtime.sendMessage({ type: "savePlain", url, filename: name, site }).catch(() => null);
   if (r?.needsPage && tabId) {
     // Page-made (blob:) file: fetch it from the page and save it as-is.
@@ -300,7 +316,7 @@ async function saveNormally(always) {
   if (!r?.ok) {
     // Can't start it again: let the next download from this site through once.
     await chrome.runtime.sendMessage({ type: "passOnce", site }).catch(() => {});
-    setStatus("ok", `Click the download button on ${site} again`, `${site} built this file inside the page and has already discarded it, so SecureDL can't save it for you. Your next download from ${site} in the next 3 minutes goes through without asking.`);
+    setStatus("error", "Couldn't save this file", `${site} may give this file only once. Your next download from ${site} in the next 3 minutes goes through without asking, so try its download button again.`);
     $("form").hidden = true;
     return;
   }
